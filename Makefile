@@ -6,7 +6,7 @@ DB_DSN ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(or $(POSTGRES_HOST)
 include .env
 export
 
-.PHONY: up down run run-mockai build sqlc-generate migrate migrate-down migrate-force test test-unit test-integration lint tidy
+.PHONY: up down run run-mockai seed build sqlc-generate migrate migrate-down migrate-force test test-unit test-integration lint tidy
 
 up:
 	docker-compose up -d
@@ -25,6 +25,12 @@ run: build
 # Run it alongside `make run` — see README's "Проверка WebSocket-пути".
 run-mockai:
 	go run ./cmd/mockai
+
+# seed inserts a couple of sample stories (with scenes and choices) into
+# the database so every endpoint can be exercised manually — there's no
+# admin panel at this stage. Safe to run more than once (idempotent).
+seed:
+	go run ./cmd/seed
 
 sqlc-generate:
 	sqlc generate

@@ -17,6 +17,10 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Build output (make build / make run compiles into here, extensionless on
+# some platforms so *.exe above doesn't catch it)
+/bin/
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 

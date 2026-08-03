@@ -24,6 +24,7 @@ Go 1.23+, Fiber v2, pgx v5 + sqlc, golang-migrate, go-redis v9, nats.go
 ```
 cmd/api/main.go          — точка входа, сборка зависимостей
 cmd/mockai/main.go       — заглушка AI Orchestrator для локальной проверки WS (не для прода)
+cmd/seed/main.go         — засевает пару тестовых историй в БД (не для прода)
 internal/config/         — вся конфигурация (единственное место с env-тегами)
 internal/auth/           — регистрация, логин, JWT, argon2id
 internal/user/           — профиль пользователя (GET/PATCH /users/me)
@@ -61,7 +62,18 @@ make up
 make migrate
 ```
 
-4. Запустить сервис:
+4. Засеять пару тестовых историй (нужно, чтобы было что дёргать через
+   `GET /stories`, `POST /scenes/:id/choice`, `POST /dialog/sessions` и т.д. —
+   админ-панели нет, это единственный способ получить контент в чистой БД):
+
+```bash
+make seed
+```
+
+Команда идемпотентна — повторный запуск не создаёт дублей. Подробнее — в
+разделе [Тестовые данные (make seed)](#тестовые-данные-make-seed).
+
+5. Запустить сервис:
 
 ```bash
 make run
@@ -123,20 +135,38 @@ websocat "ws://localhost:8080/ws?token=<ACCESS_TOKEN>"
 сервер — держите этот терминал видимым во время следующих шагов.
 
 6. **Проверка сценарного пути** (`player.choice.made` → `ai.response.ready`):
-   создать историю/сцену/выбор напрямую в БД (админ-панели нет — это вне
-   рамок этого этапа) и вызвать `POST /scenes/:id/choice` с `Authorization:
-   Bearer <ACCESS_TOKEN>`. В окне с `websocat` в течение 1-2 секунд должно
-   появиться:
+   если выполнен `make seed` (см. [Тестовые данные](#тестовые-данные-make-seed)),
+   можно сразу использовать готовый выбор из «Красной Шапочки»:
+
+```bash
+curl -s -X POST "http://localhost:8080/scenes/11111111-1111-1111-1111-111111111111/choice" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" -H "Content-Type: application/json" \
+  -d '{"choice_id":"11111111-1111-1111-1111-111111111121"}'
+```
+
+   В окне с `websocat` в течение 1-2 секунд должно появиться:
 
 ```json
 {"type":"ai_response_ready","scene_id":"...","text":"..."}
 ```
 
 7. **Проверка свободного диалога** (`dialog.message.sent` → стрим чанков →
-   `ai.dialog.response.complete`): вызвать `POST /dialog/sessions` (сцена
-   должна иметь `free_dialog_enabled = true`), затем `POST
-   /dialog/sessions/:id/messages` с телом `{"text": "Привет!"}`. В окне
-   `websocat` должны последовательно появиться 4-6 сообщений вида
+   `ai.dialog.response.complete`): сцена `11111111-1111-1111-1111-111111111112`
+   («тропинка через лес», встреча с Волком) из seed-данных уже имеет
+   `free_dialog_enabled = true`. Начать сессию и отправить сообщение
+   (перед этим нужны алмазы — см. `/dev/wallet/grant` в таблице API):
+
+```bash
+curl -s -X POST "http://localhost:8080/dialog/sessions" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" -H "Content-Type: application/json" \
+  -d '{"character_id":"11111111-1111-1111-1111-1111111111aa","scene_id":"11111111-1111-1111-1111-111111111112"}'
+# скопировать "id" сессии из ответа как <SESSION_ID>
+curl -s -X POST "http://localhost:8080/dialog/sessions/<SESSION_ID>/messages" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" -H "Content-Type: application/json" \
+  -d '{"text":"Привет!"}'
+```
+
+   В окне `websocat` должны последовательно появиться 4-6 сообщений вида
 
 ```json
 {"type":"ai_response_chunk","session_id":"...","chunk":"..."}
@@ -168,6 +198,7 @@ websocat "ws://localhost:8080/ws?token=<ACCESS_TOKEN>"
 | `make up` / `make down` | поднять/остановить Postgres, Redis, NATS через docker-compose |
 | `make migrate` | накатить все миграции |
 | `make migrate-down` | откатить последнюю миграцию |
+| `make seed` | засеять пару тестовых историй (см. [Тестовые данные](#тестовые-данные-make-seed)) |
 | `make build` | собрать бинарник в `bin/api` |
 | `make run` | собрать и запустить сервис |
 | `make run-mockai` | запустить заглушку AI Orchestrator (`cmd/mockai`) — нужна для проверки WS-пути, см. ниже |
@@ -176,6 +207,34 @@ websocat "ws://localhost:8080/ws?token=<ACCESS_TOKEN>"
 | `make test-integration` | интеграционные тесты через testcontainers-go (нужен Docker) |
 | `make test` | `test-unit` + `test-integration` |
 | `make lint` | `golangci-lint run ./...` |
+
+## Тестовые данные (`make seed`)
+
+Админ-панели на этом этапе нет, поэтому единственный способ получить в базе
+играбельный контент — команда `cmd/seed` (`make seed`). Она добавляет две
+истории по мотивам классических сюжетов из общественного достояния —
+адаптация сюжета не воспроизводит оригинальный текст дословно, это
+собственный краткий пересказ для нужд теста:
+
+- **«Красная Шапочка»** (`story_id = 11111111-1111-1111-1111-111111111101`) —
+  3 сцены: дом → тропинка через лес (сцена с Волком,
+  `free_dialog_enabled=true`, `dialog_limit_type=messages`,
+  `dialog_limit_value=5` — проверяет лимит по числу сообщений) → домик
+  бабушки. Первый выбор — один бесплатный и один платный (10 алмазов)
+  вариант, оба ведут на сцену с Волком.
+- **«Алиса в Стране чудес»** (`story_id = 22222222-2222-2222-2222-222222222201`) —
+  3 сцены: берег реки → кроличья нора (сцена с Белым Кроликом,
+  `free_dialog_enabled=true`, `dialog_limit_type=time`,
+  `dialog_limit_value=120` — проверяет лимит по времени, 2 минуты) → зал с
+  дверцами. Тоже один бесплатный и один платный (15 алмазов) вариант выбора.
+
+Оба варианта покрывают все ручки из раздела [API](#api): `GET /stories`
+вернёт обе истории, `GET /stories/:id/progress` создаст прогресс на первой
+сцене, `GET /scenes/:id` отдаст сцену с выборами, `POST /scenes/:id/choice`
+проверяется и на бесплатном, и на платном (списание с кошелька) варианте,
+`POST /dialog/sessions` + `/messages` + `/end` — на обеих сценах с разными
+типами лимита. Команда идемпотентна (фиксированные UUID + `ON CONFLICT (id)
+DO NOTHING`) — повторный `make seed` не создаёт дублей.
 
 ## Тестирование
 
