@@ -22,6 +22,7 @@ type Config struct {
 	JWT      JWTConfig
 	Dialog   DialogConfig
 	Dev      DevConfig
+	CORS     CORSConfig
 }
 
 // ServerConfig controls the HTTP server.
@@ -78,6 +79,20 @@ type DialogConfig struct {
 // enabled in production.
 type DevConfig struct {
 	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"` // включает /dev/wallet/grant
+}
+
+// CORSConfig controls which browser origins may call the API directly (the
+// mobile/desktop Flutter client isn't affected — CORS is a browser-only
+// mechanism). Default is permissive ("*") because the Flutter web dev
+// server (`flutter run -d chrome/edge`) binds a different random port on
+// every run, so there's no single fixed origin to allowlist for local dev;
+// this is safe with a wildcard specifically because auth uses a Bearer
+// token in the Authorization header, never cookies — AllowCredentials stays
+// false, so a wildcard origin can't be used to ride a user's session the
+// way it could with cookie-based auth. Restrict this to your real
+// deployed frontend origin(s) in staging/production.
+type CORSConfig struct {
+	AllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"*"` // comma-separated, or "*"
 }
 
 // Load parses environment variables into a Config, applying defaults and

@@ -67,6 +67,76 @@ func (r *PostgresRepository) GetScene(ctx context.Context, id uuid.UUID) (Scene,
 	return toDomainScene(row), nil
 }
 
+func (r *PostgresRepository) ListProgressByUser(ctx context.Context, userID uuid.UUID) ([]ProgressSummary, error) {
+	rows, err := r.queries.ListPlayerProgressByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list player progress by user: %w", err)
+	}
+	out := make([]ProgressSummary, 0, len(rows))
+	for _, row := range rows {
+		choicesMade, err := unmarshalChoicesMade(row.ChoicesMade)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ProgressSummary{
+			Story: Story{
+				ID:          row.StoryID,
+				Title:       row.StoryTitle,
+				Description: ptrFromText(row.StoryDescription),
+				CoverURL:    ptrFromText(row.StoryCoverUrl),
+				Genre:       row.StoryGenre,
+				Status:      row.StoryStatus,
+				CreatedAt:   row.StoryCreatedAt,
+			},
+			CurrentSceneID:    row.CurrentSceneID,
+			ChoicesMade:       choicesMade,
+			UpdatedAt:         row.UpdatedAt,
+			CurrentOrderIndex: row.CurrentOrderIndex,
+			TotalScenes:       row.TotalScenes,
+		})
+	}
+	return out, nil
+}
+
+func (r *PostgresRepository) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error) {
+	rows, err := r.queries.ListScenesByStory(ctx, storyID)
+	if err != nil {
+		return nil, fmt.Errorf("list scenes by story: %w", err)
+	}
+	out := make([]Scene, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDomainScene(row))
+	}
+	return out, nil
+}
+
+func (r *PostgresRepository) IsSceneUnlocked(ctx context.Context, userID, sceneID uuid.UUID) (bool, error) {
+	unlocked, err := r.queries.IsSceneUnlocked(ctx, sqlc.IsSceneUnlockedParams{UserID: userID, SceneID: sceneID})
+	if err != nil {
+		return false, fmt.Errorf("is scene unlocked: %w", err)
+	}
+	return unlocked, nil
+}
+
+func (r *PostgresRepository) ListUnlockedSceneIDs(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]bool, error) {
+	ids, err := r.queries.ListUnlockedSceneIDsByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list unlocked scene ids: %w", err)
+	}
+	out := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
+func (r *PostgresRepository) UnlockScene(ctx context.Context, userID, sceneID uuid.UUID) error {
+	if err := r.queries.CreateSceneUnlock(ctx, sqlc.CreateSceneUnlockParams{UserID: userID, SceneID: sceneID}); err != nil {
+		return fmt.Errorf("create scene unlock: %w", err)
+	}
+	return nil
+}
+
 func (r *PostgresRepository) ListChoices(ctx context.Context, sceneID uuid.UUID) ([]Choice, error) {
 	rows, err := r.queries.ListChoicesByScene(ctx, sceneID)
 	if err != nil {
@@ -140,6 +210,8 @@ func toDomainStory(s sqlc.Story) Story {
 		Title:       s.Title,
 		Description: ptrFromText(s.Description),
 		CoverURL:    ptrFromText(s.CoverUrl),
+		Genre:       s.Genre,
+		Status:      s.Status,
 		IsPublished: s.IsPublished,
 		CreatedAt:   s.CreatedAt,
 	}
@@ -147,16 +219,17 @@ func toDomainStory(s sqlc.Story) Story {
 
 func toDomainScene(s sqlc.Scene) Scene {
 	return Scene{
-		ID:                s.ID,
-		StoryID:           s.StoryID,
-		OrderIndex:        s.OrderIndex,
-		BackgroundURL:     ptrFromText(s.BackgroundUrl),
-		CharacterID:       ptrFromUUID(s.CharacterID),
-		DialogueScript:    json.RawMessage(s.DialogueScript),
-		FreeDialogEnabled: s.FreeDialogEnabled,
-		DialogLimitType:   ptrFromText(s.DialogLimitType),
-		DialogLimitValue:  ptrFromInt4(s.DialogLimitValue),
-		CreatedAt:         s.CreatedAt,
+		ID:                 s.ID,
+		StoryID:            s.StoryID,
+		OrderIndex:         s.OrderIndex,
+		BackgroundURL:      ptrFromText(s.BackgroundUrl),
+		CharacterID:        ptrFromUUID(s.CharacterID),
+		DialogueScript:     json.RawMessage(s.DialogueScript),
+		FreeDialogEnabled:  s.FreeDialogEnabled,
+		DialogLimitType:    ptrFromText(s.DialogLimitType),
+		DialogLimitValue:   ptrFromInt4(s.DialogLimitValue),
+		CreatedAt:          s.CreatedAt,
+		UnlockCostDiamonds: ptrFromInt4(s.UnlockCostDiamonds),
 	}
 }
 
@@ -172,11 +245,9 @@ func toDomainChoice(c sqlc.Choice) Choice {
 }
 
 func toDomainProgress(p sqlc.PlayerProgress) (Progress, error) {
-	var choicesMade []uuid.UUID
-	if len(p.ChoicesMade) > 0 {
-		if err := json.Unmarshal(p.ChoicesMade, &choicesMade); err != nil {
-			return Progress{}, fmt.Errorf("unmarshal choices_made: %w", err)
-		}
+	choicesMade, err := unmarshalChoicesMade(p.ChoicesMade)
+	if err != nil {
+		return Progress{}, err
 	}
 	return Progress{
 		UserID:         p.UserID,
@@ -185,6 +256,16 @@ func toDomainProgress(p sqlc.PlayerProgress) (Progress, error) {
 		ChoicesMade:    choicesMade,
 		UpdatedAt:      p.UpdatedAt,
 	}, nil
+}
+
+func unmarshalChoicesMade(raw []byte) ([]uuid.UUID, error) {
+	var choicesMade []uuid.UUID
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &choicesMade); err != nil {
+			return nil, fmt.Errorf("unmarshal choices_made: %w", err)
+		}
+	}
+	return choicesMade, nil
 }
 
 func ptrFromText(t pgtype.Text) *string {

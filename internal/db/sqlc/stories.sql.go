@@ -12,7 +12,7 @@ import (
 )
 
 const getFirstSceneOfStory = `-- name: GetFirstSceneOfStory :one
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at FROM scenes WHERE story_id = $1 ORDER BY order_index ASC LIMIT 1
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds FROM scenes WHERE story_id = $1 ORDER BY order_index ASC LIMIT 1
 `
 
 func (q *Queries) GetFirstSceneOfStory(ctx context.Context, storyID uuid.UUID) (Scene, error) {
@@ -29,12 +29,13 @@ func (q *Queries) GetFirstSceneOfStory(ctx context.Context, storyID uuid.UUID) (
 		&i.DialogLimitType,
 		&i.DialogLimitValue,
 		&i.CreatedAt,
+		&i.UnlockCostDiamonds,
 	)
 	return i, err
 }
 
 const getStory = `-- name: GetStory :one
-SELECT id, title, description, cover_url, is_published, created_at FROM stories WHERE id = $1
+SELECT id, title, description, cover_url, is_published, created_at, genre, status FROM stories WHERE id = $1
 `
 
 func (q *Queries) GetStory(ctx context.Context, id uuid.UUID) (Story, error) {
@@ -47,12 +48,14 @@ func (q *Queries) GetStory(ctx context.Context, id uuid.UUID) (Story, error) {
 		&i.CoverUrl,
 		&i.IsPublished,
 		&i.CreatedAt,
+		&i.Genre,
+		&i.Status,
 	)
 	return i, err
 }
 
 const listPublishedStories = `-- name: ListPublishedStories :many
-SELECT id, title, description, cover_url, is_published, created_at FROM stories WHERE is_published = true ORDER BY created_at DESC
+SELECT id, title, description, cover_url, is_published, created_at, genre, status FROM stories WHERE is_published = true ORDER BY created_at DESC
 `
 
 func (q *Queries) ListPublishedStories(ctx context.Context) ([]Story, error) {
@@ -71,6 +74,8 @@ func (q *Queries) ListPublishedStories(ctx context.Context) ([]Story, error) {
 			&i.CoverUrl,
 			&i.IsPublished,
 			&i.CreatedAt,
+			&i.Genre,
+			&i.Status,
 		); err != nil {
 			return nil, err
 		}

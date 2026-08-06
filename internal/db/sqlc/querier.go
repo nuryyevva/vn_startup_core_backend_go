@@ -14,6 +14,7 @@ type Querier interface {
 	CreateDialogMessage(ctx context.Context, arg CreateDialogMessageParams) (DialogMessage, error)
 	CreateDialogSession(ctx context.Context, arg CreateDialogSessionParams) (DialogSession, error)
 	CreatePlayerProgress(ctx context.Context, arg CreatePlayerProgressParams) (PlayerProgress, error)
+	CreateSceneUnlock(ctx context.Context, arg CreateSceneUnlockParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error)
 	CreateWalletTransaction(ctx context.Context, arg CreateWalletTransactionParams) (WalletTransaction, error)
@@ -31,10 +32,14 @@ type Querier interface {
 	GetUserWithProfile(ctx context.Context, id uuid.UUID) (GetUserWithProfileRow, error)
 	GetWalletBalance(ctx context.Context, userID uuid.UUID) (int64, error)
 	IncrementDialogSessionMessageCount(ctx context.Context, id uuid.UUID) (DialogSession, error)
+	IsSceneUnlocked(ctx context.Context, arg IsSceneUnlockedParams) (bool, error)
 	ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]Choice, error)
 	ListDialogMessages(ctx context.Context, sessionID uuid.UUID) ([]DialogMessage, error)
 	ListExpiredTimeLimitedSessions(ctx context.Context) ([]DialogSession, error)
+	ListPlayerProgressByUser(ctx context.Context, userID uuid.UUID) ([]ListPlayerProgressByUserRow, error)
 	ListPublishedStories(ctx context.Context) ([]Story, error)
+	ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error)
+	ListUnlockedSceneIDsByUser(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	// Advisory transaction-scoped lock keyed by user id. wallet_transactions has
 	// no balance row to lock with SELECT ... FOR UPDATE, and locking existing
 	// rows wouldn't block a concurrent INSERT anyway, so we serialize

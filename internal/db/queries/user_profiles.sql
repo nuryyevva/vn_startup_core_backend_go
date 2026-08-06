@@ -7,7 +7,7 @@ RETURNING *;
 SELECT * FROM user_profiles WHERE user_id = $1;
 
 -- name: GetUserWithProfile :one
-SELECT u.id, u.email, u.role, p.display_name, p.gender, p.hobbies, p.theme, p.language, p.updated_at
+SELECT u.id, u.email, u.role, u.created_at, p.display_name, p.gender, p.favorite_genres, p.theme, p.language, p.updated_at
 FROM users u
 JOIN user_profiles p ON p.user_id = u.id
 WHERE u.id = $1;
@@ -17,7 +17,7 @@ UPDATE user_profiles
 SET
     display_name = COALESCE(sqlc.narg('display_name'), display_name),
     gender = COALESCE(sqlc.narg('gender'), gender),
-    hobbies = COALESCE(sqlc.narg('hobbies'), hobbies),
+    favorite_genres = COALESCE(sqlc.narg('favorite_genres'), favorite_genres),
     theme = COALESCE(sqlc.narg('theme'), theme),
     language = COALESCE(sqlc.narg('language'), language),
     updated_at = now()

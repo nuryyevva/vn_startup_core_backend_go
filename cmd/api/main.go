@@ -98,7 +98,7 @@ func run() error {
 	dialogHandler := dialog.NewHandler(dialogService)
 	realtimeHandler := realtime.NewHandler(hub, log)
 
-	app := httpserver.New(log)
+	app := httpserver.New(log, cfg.CORS.AllowedOrigins)
 
 	app.Use("/auth/login", middleware.RateLimitByIP(redisClient, "auth_login", 20, time.Minute))
 	app.Use("/auth/register", middleware.RateLimitByIP(redisClient, "auth_register", 10, time.Minute))

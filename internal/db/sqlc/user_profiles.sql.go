@@ -16,7 +16,7 @@ import (
 const createUserProfile = `-- name: CreateUserProfile :one
 INSERT INTO user_profiles (user_id)
 VALUES ($1)
-RETURNING user_id, display_name, gender, hobbies, theme, language, updated_at
+RETURNING user_id, display_name, gender, favorite_genres, theme, language, updated_at
 `
 
 func (q *Queries) CreateUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error) {
@@ -26,7 +26,7 @@ func (q *Queries) CreateUserProfile(ctx context.Context, userID uuid.UUID) (User
 		&i.UserID,
 		&i.DisplayName,
 		&i.Gender,
-		&i.Hobbies,
+		&i.FavoriteGenres,
 		&i.Theme,
 		&i.Language,
 		&i.UpdatedAt,
@@ -35,7 +35,7 @@ func (q *Queries) CreateUserProfile(ctx context.Context, userID uuid.UUID) (User
 }
 
 const getUserProfile = `-- name: GetUserProfile :one
-SELECT user_id, display_name, gender, hobbies, theme, language, updated_at FROM user_profiles WHERE user_id = $1
+SELECT user_id, display_name, gender, favorite_genres, theme, language, updated_at FROM user_profiles WHERE user_id = $1
 `
 
 func (q *Queries) GetUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error) {
@@ -45,7 +45,7 @@ func (q *Queries) GetUserProfile(ctx context.Context, userID uuid.UUID) (UserPro
 		&i.UserID,
 		&i.DisplayName,
 		&i.Gender,
-		&i.Hobbies,
+		&i.FavoriteGenres,
 		&i.Theme,
 		&i.Language,
 		&i.UpdatedAt,
@@ -54,22 +54,23 @@ func (q *Queries) GetUserProfile(ctx context.Context, userID uuid.UUID) (UserPro
 }
 
 const getUserWithProfile = `-- name: GetUserWithProfile :one
-SELECT u.id, u.email, u.role, p.display_name, p.gender, p.hobbies, p.theme, p.language, p.updated_at
+SELECT u.id, u.email, u.role, u.created_at, p.display_name, p.gender, p.favorite_genres, p.theme, p.language, p.updated_at
 FROM users u
 JOIN user_profiles p ON p.user_id = u.id
 WHERE u.id = $1
 `
 
 type GetUserWithProfileRow struct {
-	ID          uuid.UUID   `json:"id"`
-	Email       string      `json:"email"`
-	Role        string      `json:"role"`
-	DisplayName pgtype.Text `json:"display_name"`
-	Gender      pgtype.Text `json:"gender"`
-	Hobbies     []string    `json:"hobbies"`
-	Theme       string      `json:"theme"`
-	Language    string      `json:"language"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	ID             uuid.UUID   `json:"id"`
+	Email          string      `json:"email"`
+	Role           string      `json:"role"`
+	CreatedAt      time.Time   `json:"created_at"`
+	DisplayName    pgtype.Text `json:"display_name"`
+	Gender         pgtype.Text `json:"gender"`
+	FavoriteGenres []string    `json:"favorite_genres"`
+	Theme          string      `json:"theme"`
+	Language       string      `json:"language"`
+	UpdatedAt      time.Time   `json:"updated_at"`
 }
 
 func (q *Queries) GetUserWithProfile(ctx context.Context, id uuid.UUID) (GetUserWithProfileRow, error) {
@@ -79,9 +80,10 @@ func (q *Queries) GetUserWithProfile(ctx context.Context, id uuid.UUID) (GetUser
 		&i.ID,
 		&i.Email,
 		&i.Role,
+		&i.CreatedAt,
 		&i.DisplayName,
 		&i.Gender,
-		&i.Hobbies,
+		&i.FavoriteGenres,
 		&i.Theme,
 		&i.Language,
 		&i.UpdatedAt,
@@ -94,28 +96,28 @@ UPDATE user_profiles
 SET
     display_name = COALESCE($1, display_name),
     gender = COALESCE($2, gender),
-    hobbies = COALESCE($3, hobbies),
+    favorite_genres = COALESCE($3, favorite_genres),
     theme = COALESCE($4, theme),
     language = COALESCE($5, language),
     updated_at = now()
 WHERE user_id = $6
-RETURNING user_id, display_name, gender, hobbies, theme, language, updated_at
+RETURNING user_id, display_name, gender, favorite_genres, theme, language, updated_at
 `
 
 type UpdateUserProfileParams struct {
-	DisplayName pgtype.Text `json:"display_name"`
-	Gender      pgtype.Text `json:"gender"`
-	Hobbies     []string    `json:"hobbies"`
-	Theme       pgtype.Text `json:"theme"`
-	Language    pgtype.Text `json:"language"`
-	UserID      uuid.UUID   `json:"user_id"`
+	DisplayName    pgtype.Text `json:"display_name"`
+	Gender         pgtype.Text `json:"gender"`
+	FavoriteGenres []string    `json:"favorite_genres"`
+	Theme          pgtype.Text `json:"theme"`
+	Language       pgtype.Text `json:"language"`
+	UserID         uuid.UUID   `json:"user_id"`
 }
 
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UserProfile, error) {
 	row := q.db.QueryRow(ctx, updateUserProfile,
 		arg.DisplayName,
 		arg.Gender,
-		arg.Hobbies,
+		arg.FavoriteGenres,
 		arg.Theme,
 		arg.Language,
 		arg.UserID,
@@ -125,7 +127,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.UserID,
 		&i.DisplayName,
 		&i.Gender,
-		&i.Hobbies,
+		&i.FavoriteGenres,
 		&i.Theme,
 		&i.Language,
 		&i.UpdatedAt,

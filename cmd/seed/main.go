@@ -73,19 +73,22 @@ type story struct {
 	title       string
 	description string
 	coverURL    string
+	genre       string
+	status      string
 	scenes      []scene
 	choices     []choice
 }
 
 type scene struct {
-	id                uuid.UUID
-	orderIndex        int
-	backgroundURL     string
-	characterID       *uuid.UUID
-	dialogueScript    string // JSON array literal
-	freeDialogEnabled bool
-	dialogLimitType   *string // "time" | "messages" | nil
-	dialogLimitValue  *int32
+	id                 uuid.UUID
+	orderIndex         int
+	backgroundURL      string
+	characterID        *uuid.UUID
+	dialogueScript     string // JSON array literal
+	freeDialogEnabled  bool
+	dialogLimitType    *string // "time" | "messages" | nil
+	dialogLimitValue   *int32
+	unlockCostDiamonds *int32
 }
 
 type choice struct {
@@ -109,21 +112,21 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO stories (id, title, description, cover_url, is_published)
-		 VALUES ($1, $2, $3, $4, true)
+		`INSERT INTO stories (id, title, description, cover_url, genre, status, is_published)
+		 VALUES ($1, $2, $3, $4, $5, $6, true)
 		 ON CONFLICT (id) DO NOTHING`,
-		s.id, s.title, s.description, s.coverURL,
+		s.id, s.title, s.description, s.coverURL, s.genre, s.status,
 	); err != nil {
 		return fmt.Errorf("insert story: %w", err)
 	}
 
 	for _, sc := range s.scenes {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			 ON CONFLICT (id) DO NOTHING`,
 			sc.id, s.id, sc.orderIndex, sc.backgroundURL, sc.characterID,
-			[]byte(sc.dialogueScript), sc.freeDialogEnabled, sc.dialogLimitType, sc.dialogLimitValue,
+			[]byte(sc.dialogueScript), sc.freeDialogEnabled, sc.dialogLimitType, sc.dialogLimitValue, sc.unlockCostDiamonds,
 		); err != nil {
 			return fmt.Errorf("insert scene %s: %w", sc.id, err)
 		}
@@ -184,6 +187,8 @@ func redRidingHoodStory() story {
 		title:       "Красная Шапочка",
 		description: "Классическая сказка о девочке в красной шапочке, тропинке через лес и Волке, который выдаёт себя за бабушку.",
 		coverURL:    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Gustave_Dor%C3%A9_-_Le_Petit_Chaperon_rouge.jpg/400px-Gustave_Dor%C3%A9_-_Le_Petit_Chaperon_rouge.jpg",
+		genre:       "fantasy",
+		status:      "completed",
 		scenes: []scene{
 			{
 				id:                redRidingHoodScene1ID,
@@ -203,11 +208,12 @@ func redRidingHoodStory() story {
 				dialogLimitValue:  i32Ptr(5),
 			},
 			{
-				id:                redRidingHoodScene3ID,
-				orderIndex:        2,
-				backgroundURL:     "https://example.com/backgrounds/riding-hood/cottage.jpg",
-				dialogueScript:    `[{"speaker":"narrator","text":"Девочка постучала в дверь бабушкиного домика. \"Кто там?\" — раздался странно низкий голос."}]`,
-				freeDialogEnabled: false,
+				id:                 redRidingHoodScene3ID,
+				orderIndex:         2,
+				backgroundURL:      "https://example.com/backgrounds/riding-hood/cottage.jpg",
+				dialogueScript:     `[{"speaker":"narrator","text":"Девочка постучала в дверь бабушкиного домика. \"Кто там?\" — раздался странно низкий голос."}]`,
+				freeDialogEnabled:  false,
+				unlockCostDiamonds: i32Ptr(25),
 			},
 		},
 		choices: []choice{
@@ -245,6 +251,8 @@ func aliceStory() story {
 		title:       "Алиса в Стране чудес",
 		description: "Скучающая на берегу реки Алиса замечает спешащего Белого Кролика с карманными часами — и следует за ним в кроличью нору.",
 		coverURL:    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Alice_par_John_Tenniel_02.png/400px-Alice_par_John_Tenniel_02.png",
+		genre:       "adventure",
+		status:      "ongoing",
 		scenes: []scene{
 			{
 				id:                aliceScene1ID,
@@ -264,11 +272,12 @@ func aliceStory() story {
 				dialogLimitValue:  i32Ptr(120),
 			},
 			{
-				id:                aliceScene3ID,
-				orderIndex:        2,
-				backgroundURL:     "https://example.com/backgrounds/alice/garden-door.jpg",
-				dialogueScript:    `[{"speaker":"narrator","text":"Алиса оказалась в длинном низком зале, вдоль которого стоял ряд запертых дверей, а на стеклянном столике лежал крошечный золотой ключик."}]`,
-				freeDialogEnabled: false,
+				id:                 aliceScene3ID,
+				orderIndex:         2,
+				backgroundURL:      "https://example.com/backgrounds/alice/garden-door.jpg",
+				dialogueScript:     `[{"speaker":"narrator","text":"Алиса оказалась в длинном низком зале, вдоль которого стоял ряд запертых дверей, а на стеклянном столике лежал крошечный золотой ключик."}]`,
+				freeDialogEnabled:  false,
+				unlockCostDiamonds: i32Ptr(15),
 			},
 		},
 		choices: []choice{

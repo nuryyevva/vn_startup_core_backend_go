@@ -52,16 +52,23 @@ type PlayerProgress struct {
 }
 
 type Scene struct {
-	ID                uuid.UUID   `json:"id"`
-	StoryID           uuid.UUID   `json:"story_id"`
-	OrderIndex        int32       `json:"order_index"`
-	BackgroundUrl     pgtype.Text `json:"background_url"`
-	CharacterID       pgtype.UUID `json:"character_id"`
-	DialogueScript    []byte      `json:"dialogue_script"`
-	FreeDialogEnabled bool        `json:"free_dialog_enabled"`
-	DialogLimitType   pgtype.Text `json:"dialog_limit_type"`
-	DialogLimitValue  pgtype.Int4 `json:"dialog_limit_value"`
-	CreatedAt         time.Time   `json:"created_at"`
+	ID                 uuid.UUID   `json:"id"`
+	StoryID            uuid.UUID   `json:"story_id"`
+	OrderIndex         int32       `json:"order_index"`
+	BackgroundUrl      pgtype.Text `json:"background_url"`
+	CharacterID        pgtype.UUID `json:"character_id"`
+	DialogueScript     []byte      `json:"dialogue_script"`
+	FreeDialogEnabled  bool        `json:"free_dialog_enabled"`
+	DialogLimitType    pgtype.Text `json:"dialog_limit_type"`
+	DialogLimitValue   pgtype.Int4 `json:"dialog_limit_value"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UnlockCostDiamonds pgtype.Int4 `json:"unlock_cost_diamonds"`
+}
+
+type SceneUnlock struct {
+	UserID     uuid.UUID `json:"user_id"`
+	SceneID    uuid.UUID `json:"scene_id"`
+	UnlockedAt time.Time `json:"unlocked_at"`
 }
 
 type Story struct {
@@ -71,6 +78,8 @@ type Story struct {
 	CoverUrl    pgtype.Text `json:"cover_url"`
 	IsPublished bool        `json:"is_published"`
 	CreatedAt   time.Time   `json:"created_at"`
+	Genre       string      `json:"genre"`
+	Status      string      `json:"status"`
 }
 
 type User struct {
@@ -82,13 +91,13 @@ type User struct {
 }
 
 type UserProfile struct {
-	UserID      uuid.UUID   `json:"user_id"`
-	DisplayName pgtype.Text `json:"display_name"`
-	Gender      pgtype.Text `json:"gender"`
-	Hobbies     []string    `json:"hobbies"`
-	Theme       string      `json:"theme"`
-	Language    string      `json:"language"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	UserID         uuid.UUID   `json:"user_id"`
+	DisplayName    pgtype.Text `json:"display_name"`
+	Gender         pgtype.Text `json:"gender"`
+	FavoriteGenres []string    `json:"favorite_genres"`
+	Theme          string      `json:"theme"`
+	Language       string      `json:"language"`
+	UpdatedAt      time.Time   `json:"updated_at"`
 }
 
 type WalletTransaction struct {

@@ -19,9 +19,12 @@ func NewHandler(service *Service) *Handler {
 // RegisterRoutes wires the story endpoints onto router, gated by auth.
 func (h *Handler) RegisterRoutes(router fiber.Router, auth fiber.Handler) {
 	router.Get("/stories", auth, h.listStories)
+	router.Get("/progress", auth, h.listMyProgress)
 	router.Get("/stories/:id/progress", auth, h.getProgress)
+	router.Get("/stories/:id/scenes", auth, h.listStoryScenes)
 	router.Get("/scenes/:id", auth, h.getScene)
 	router.Post("/scenes/:id/choice", auth, h.submitChoice)
+	router.Post("/scenes/:id/unlock", auth, h.unlockScene)
 }
 
 func (h *Handler) listStories(c *fiber.Ctx) error {
@@ -30,6 +33,20 @@ func (h *Handler) listStories(c *fiber.Ctx) error {
 		return err
 	}
 	return c.JSON(toStoryResponses(stories))
+}
+
+func (h *Handler) listMyProgress(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	summaries, err := h.service.ListMyProgress(c.Context(), userID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(toProgressSummaryResponses(summaries))
 }
 
 func (h *Handler) getProgress(c *fiber.Ctx) error {
@@ -52,17 +69,59 @@ func (h *Handler) getProgress(c *fiber.Ctx) error {
 }
 
 func (h *Handler) getScene(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
 	sceneID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return apperr.BadRequest("invalid_scene_id", "Некорректный идентификатор сцены")
 	}
 
-	scene, choices, err := h.service.GetScene(c.Context(), sceneID)
+	scene, choices, err := h.service.GetSceneForPlayer(c.Context(), userID, sceneID)
 	if err != nil {
 		return err
 	}
 
 	return c.JSON(toSceneResponse(scene, choices))
+}
+
+func (h *Handler) listStoryScenes(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	storyID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return apperr.BadRequest("invalid_story_id", "Некорректный идентификатор истории")
+	}
+
+	scenes, unlockedSceneIDs, err := h.service.ListStoryScenes(c.Context(), userID, storyID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(toSceneSummaryResponses(scenes, unlockedSceneIDs))
+}
+
+func (h *Handler) unlockScene(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	sceneID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return apperr.BadRequest("invalid_scene_id", "Некорректный идентификатор сцены")
+	}
+
+	if err := h.service.UnlockScene(c.Context(), userID, sceneID); err != nil {
+		return err
+	}
+
+	return c.JSON(SceneUnlockResponse{SceneID: sceneID, Unlocked: true})
 }
 
 func (h *Handler) submitChoice(c *fiber.Ctx) error {

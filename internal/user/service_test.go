@@ -56,8 +56,8 @@ func TestService_UpdateProfile_PassesInputThrough(t *testing.T) {
 
 	userID := uuid.New()
 	name := "Nova"
-	req := UpdateProfileRequest{DisplayName: &name, Hobbies: []string{"chess", "hiking"}}
-	expected := Profile{UserID: userID, DisplayName: &name, Hobbies: []string{"chess", "hiking"}}
+	req := UpdateProfileRequest{DisplayName: &name, FavoriteGenres: []string{"fantasy", "mystery"}}
+	expected := Profile{UserID: userID, DisplayName: &name, FavoriteGenres: []string{"fantasy", "mystery"}}
 
 	repo.On("UpdateProfile", mock.Anything, userID, UpdateProfileInput(req)).Return(expected, nil)
 

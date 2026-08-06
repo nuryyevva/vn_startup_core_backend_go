@@ -11,6 +11,21 @@ import (
 	"github.com/google/uuid"
 )
 
+const createSceneUnlock = `-- name: CreateSceneUnlock :exec
+INSERT INTO scene_unlocks (user_id, scene_id) VALUES ($1, $2)
+ON CONFLICT (user_id, scene_id) DO NOTHING
+`
+
+type CreateSceneUnlockParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	SceneID uuid.UUID `json:"scene_id"`
+}
+
+func (q *Queries) CreateSceneUnlock(ctx context.Context, arg CreateSceneUnlockParams) error {
+	_, err := q.db.Exec(ctx, createSceneUnlock, arg.UserID, arg.SceneID)
+	return err
+}
+
 const getChoice = `-- name: GetChoice :one
 SELECT id, scene_id, text, is_paid, cost_diamonds, next_scene_id FROM choices WHERE id = $1
 `
@@ -30,7 +45,7 @@ func (q *Queries) GetChoice(ctx context.Context, id uuid.UUID) (Choice, error) {
 }
 
 const getScene = `-- name: GetScene :one
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at FROM scenes WHERE id = $1
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds FROM scenes WHERE id = $1
 `
 
 func (q *Queries) GetScene(ctx context.Context, id uuid.UUID) (Scene, error) {
@@ -47,8 +62,25 @@ func (q *Queries) GetScene(ctx context.Context, id uuid.UUID) (Scene, error) {
 		&i.DialogLimitType,
 		&i.DialogLimitValue,
 		&i.CreatedAt,
+		&i.UnlockCostDiamonds,
 	)
 	return i, err
+}
+
+const isSceneUnlocked = `-- name: IsSceneUnlocked :one
+SELECT EXISTS(SELECT 1 FROM scene_unlocks WHERE user_id = $1 AND scene_id = $2)
+`
+
+type IsSceneUnlockedParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	SceneID uuid.UUID `json:"scene_id"`
+}
+
+func (q *Queries) IsSceneUnlocked(ctx context.Context, arg IsSceneUnlockedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isSceneUnlocked, arg.UserID, arg.SceneID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const listChoicesByScene = `-- name: ListChoicesByScene :many
@@ -75,6 +107,66 @@ func (q *Queries) ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listScenesByStory = `-- name: ListScenesByStory :many
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds FROM scenes WHERE story_id = $1 ORDER BY order_index ASC
+`
+
+func (q *Queries) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error) {
+	rows, err := q.db.Query(ctx, listScenesByStory, storyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Scene{}
+	for rows.Next() {
+		var i Scene
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoryID,
+			&i.OrderIndex,
+			&i.BackgroundUrl,
+			&i.CharacterID,
+			&i.DialogueScript,
+			&i.FreeDialogEnabled,
+			&i.DialogLimitType,
+			&i.DialogLimitValue,
+			&i.CreatedAt,
+			&i.UnlockCostDiamonds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUnlockedSceneIDsByUser = `-- name: ListUnlockedSceneIDsByUser :many
+SELECT scene_id FROM scene_unlocks WHERE user_id = $1
+`
+
+func (q *Queries) ListUnlockedSceneIDsByUser(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listUnlockedSceneIDsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var scene_id uuid.UUID
+		if err := rows.Scan(&scene_id); err != nil {
+			return nil, err
+		}
+		items = append(items, scene_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

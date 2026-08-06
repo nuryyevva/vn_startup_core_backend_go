@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 
 	"github.com/google/uuid"
 
@@ -19,7 +20,10 @@ type Wallet interface {
 	Debit(ctx context.Context, userID uuid.UUID, amount int32, reason string) error
 }
 
-const walletReasonChoicePurchase = "choice_purchase"
+const (
+	walletReasonChoicePurchase = "choice_purchase"
+	walletReasonSceneUnlock    = "scene_unlock"
+)
 
 type Service struct {
 	repo      Repository
@@ -68,6 +72,16 @@ func (s *Service) GetOrCreateProgress(ctx context.Context, userID, storyID uuid.
 	return s.repo.CreateProgress(ctx, userID, storyID, firstScene.ID)
 }
 
+// ListMyProgress returns every story userID has made progress on, most
+// recently updated first — the data source for the stories screen's
+// "Continue Reading" section and the profile screen's "My Library" /
+// "finished" stat, none of which can be derived from
+// GetOrCreateProgress (it creates a row as a side effect, so calling it
+// per-story would fabricate progress on stories the player never opened).
+func (s *Service) ListMyProgress(ctx context.Context, userID uuid.UUID) ([]ProgressSummary, error) {
+	return s.repo.ListProgressByUser(ctx, userID)
+}
+
 func (s *Service) GetScene(ctx context.Context, sceneID uuid.UUID) (Scene, []Choice, error) {
 	scene, err := s.repo.GetScene(ctx, sceneID)
 	if err != nil {
@@ -83,6 +97,97 @@ func (s *Service) GetScene(ctx context.Context, sceneID uuid.UUID) (Scene, []Cho
 	}
 
 	return scene, choices, nil
+}
+
+// GetSceneForPlayer is like GetScene but enforces the paid-unlock gate: if
+// the scene has a non-nil UnlockCostDiamonds and userID hasn't unlocked it
+// yet (via UnlockScene), it refuses to return the scene's content at all —
+// unlocking is a precondition, not something inferred from the response.
+func (s *Service) GetSceneForPlayer(ctx context.Context, userID, sceneID uuid.UUID) (Scene, []Choice, error) {
+	scene, err := s.repo.GetScene(ctx, sceneID)
+	if err != nil {
+		if errors.Is(err, ErrSceneNotFound) {
+			return Scene{}, nil, apperr.NotFound("scene_not_found", "Сцена не найдена")
+		}
+		return Scene{}, nil, err
+	}
+
+	if scene.UnlockCostDiamonds != nil {
+		unlocked, err := s.repo.IsSceneUnlocked(ctx, userID, sceneID)
+		if err != nil {
+			return Scene{}, nil, err
+		}
+		if !unlocked {
+			return Scene{}, nil, apperr.New(http.StatusPaymentRequired, "scene_locked", "Глава заблокирована, необходимо разблокировать за алмазы")
+		}
+	}
+
+	choices, err := s.repo.ListChoices(ctx, sceneID)
+	if err != nil {
+		return Scene{}, nil, err
+	}
+
+	return scene, choices, nil
+}
+
+// ListStoryScenes returns every scene of storyID with a per-user lock flag,
+// used to render the chapter list on the story detail screen.
+func (s *Service) ListStoryScenes(ctx context.Context, userID, storyID uuid.UUID) ([]Scene, map[uuid.UUID]bool, error) {
+	if _, err := s.repo.GetStory(ctx, storyID); err != nil {
+		if errors.Is(err, ErrStoryNotFound) {
+			return nil, nil, apperr.NotFound("story_not_found", "История не найдена")
+		}
+		return nil, nil, err
+	}
+
+	scenes, err := s.repo.ListScenesByStory(ctx, storyID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	unlockedSceneIDs, err := s.repo.ListUnlockedSceneIDs(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return scenes, unlockedSceneIDs, nil
+}
+
+// UnlockScene charges userID scene.UnlockCostDiamonds and records the
+// unlock, so a later GetSceneForPlayer call succeeds. It is idempotent:
+// calling it again on an already-unlocked scene succeeds without a second
+// charge. Scenes with no unlock cost can't be "unlocked" (there's nothing to
+// pay for) and return scene_not_locked.
+func (s *Service) UnlockScene(ctx context.Context, userID, sceneID uuid.UUID) error {
+	scene, err := s.repo.GetScene(ctx, sceneID)
+	if err != nil {
+		if errors.Is(err, ErrSceneNotFound) {
+			return apperr.NotFound("scene_not_found", "Сцена не найдена")
+		}
+		return err
+	}
+
+	if scene.UnlockCostDiamonds == nil {
+		return apperr.BadRequest("scene_not_locked", "Эта глава не требует разблокировки")
+	}
+
+	alreadyUnlocked, err := s.repo.IsSceneUnlocked(ctx, userID, sceneID)
+	if err != nil {
+		return err
+	}
+	if alreadyUnlocked {
+		return nil
+	}
+
+	if err := s.wallet.Debit(ctx, userID, *scene.UnlockCostDiamonds, walletReasonSceneUnlock); err != nil {
+		return err
+	}
+
+	if err := s.repo.UnlockScene(ctx, userID, sceneID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SubmitChoice validates and applies a player's choice on sceneID: charges

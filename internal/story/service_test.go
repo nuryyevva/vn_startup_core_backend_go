@@ -62,6 +62,31 @@ func (m *mockRepository) UpdateProgress(ctx context.Context, userID, storyID, sc
 	return args.Get(0).(Progress), args.Error(1)
 }
 
+func (m *mockRepository) ListProgressByUser(ctx context.Context, userID uuid.UUID) ([]ProgressSummary, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]ProgressSummary), args.Error(1)
+}
+
+func (m *mockRepository) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error) {
+	args := m.Called(ctx, storyID)
+	return args.Get(0).([]Scene), args.Error(1)
+}
+
+func (m *mockRepository) IsSceneUnlocked(ctx context.Context, userID, sceneID uuid.UUID) (bool, error) {
+	args := m.Called(ctx, userID, sceneID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *mockRepository) ListUnlockedSceneIDs(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]bool, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).(map[uuid.UUID]bool), args.Error(1)
+}
+
+func (m *mockRepository) UnlockScene(ctx context.Context, userID, sceneID uuid.UUID) error {
+	args := m.Called(ctx, userID, sceneID)
+	return args.Error(0)
+}
+
 type mockWallet struct {
 	mock.Mock
 }
@@ -206,6 +231,176 @@ func TestService_SubmitChoice_ChoiceNotInScene(t *testing.T) {
 	var appErr *apperr.Error
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, "choice_not_in_scene", appErr.Code)
+}
+
+func TestService_GetSceneForPlayer_FreeSceneNeedsNoUnlock(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	sceneID := uuid.New()
+	scene := Scene{ID: sceneID}
+	repo.On("GetScene", mock.Anything, sceneID).Return(scene, nil)
+	repo.On("ListChoices", mock.Anything, sceneID).Return([]Choice{}, nil)
+
+	got, _, err := svc.GetSceneForPlayer(context.Background(), uuid.New(), sceneID)
+
+	require.NoError(t, err)
+	assert.Equal(t, scene, got)
+	repo.AssertNotCalled(t, "IsSceneUnlocked", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestService_GetSceneForPlayer_LockedSceneDeniesAccess(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, sceneID := uuid.New(), uuid.New()
+	cost := int32(25)
+	scene := Scene{ID: sceneID, UnlockCostDiamonds: &cost}
+	repo.On("GetScene", mock.Anything, sceneID).Return(scene, nil)
+	repo.On("IsSceneUnlocked", mock.Anything, userID, sceneID).Return(false, nil)
+
+	_, _, err := svc.GetSceneForPlayer(context.Background(), userID, sceneID)
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "scene_locked", appErr.Code)
+	repo.AssertNotCalled(t, "ListChoices", mock.Anything, mock.Anything)
+}
+
+func TestService_GetSceneForPlayer_UnlockedPaidSceneGrantsAccess(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, sceneID := uuid.New(), uuid.New()
+	cost := int32(25)
+	scene := Scene{ID: sceneID, UnlockCostDiamonds: &cost}
+	repo.On("GetScene", mock.Anything, sceneID).Return(scene, nil)
+	repo.On("IsSceneUnlocked", mock.Anything, userID, sceneID).Return(true, nil)
+	repo.On("ListChoices", mock.Anything, sceneID).Return([]Choice{}, nil)
+
+	got, _, err := svc.GetSceneForPlayer(context.Background(), userID, sceneID)
+
+	require.NoError(t, err)
+	assert.Equal(t, scene, got)
+}
+
+func TestService_UnlockScene_DebitsWalletAndRecordsUnlock(t *testing.T) {
+	repo := new(mockRepository)
+	wallet := new(mockWallet)
+	svc := NewService(repo, wallet, new(mockPublisher), nil)
+
+	userID, sceneID := uuid.New(), uuid.New()
+	cost := int32(25)
+	scene := Scene{ID: sceneID, UnlockCostDiamonds: &cost}
+	repo.On("GetScene", mock.Anything, sceneID).Return(scene, nil)
+	repo.On("IsSceneUnlocked", mock.Anything, userID, sceneID).Return(false, nil)
+	wallet.On("Debit", mock.Anything, userID, int32(25), "scene_unlock").Return(nil)
+	repo.On("UnlockScene", mock.Anything, userID, sceneID).Return(nil)
+
+	err := svc.UnlockScene(context.Background(), userID, sceneID)
+
+	require.NoError(t, err)
+	wallet.AssertExpectations(t)
+	repo.AssertExpectations(t)
+}
+
+func TestService_UnlockScene_AlreadyUnlockedIsIdempotent(t *testing.T) {
+	repo := new(mockRepository)
+	wallet := new(mockWallet)
+	svc := NewService(repo, wallet, new(mockPublisher), nil)
+
+	userID, sceneID := uuid.New(), uuid.New()
+	cost := int32(25)
+	scene := Scene{ID: sceneID, UnlockCostDiamonds: &cost}
+	repo.On("GetScene", mock.Anything, sceneID).Return(scene, nil)
+	repo.On("IsSceneUnlocked", mock.Anything, userID, sceneID).Return(true, nil)
+
+	err := svc.UnlockScene(context.Background(), userID, sceneID)
+
+	require.NoError(t, err)
+	wallet.AssertNotCalled(t, "Debit", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	repo.AssertNotCalled(t, "UnlockScene", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestService_UnlockScene_SceneWithoutCostRejected(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	sceneID := uuid.New()
+	repo.On("GetScene", mock.Anything, sceneID).Return(Scene{ID: sceneID}, nil)
+
+	err := svc.UnlockScene(context.Background(), uuid.New(), sceneID)
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "scene_not_locked", appErr.Code)
+}
+
+func TestService_UnlockScene_InsufficientFundsPropagates(t *testing.T) {
+	repo := new(mockRepository)
+	wallet := new(mockWallet)
+	svc := NewService(repo, wallet, new(mockPublisher), nil)
+
+	userID, sceneID := uuid.New(), uuid.New()
+	cost := int32(999)
+	scene := Scene{ID: sceneID, UnlockCostDiamonds: &cost}
+	repo.On("GetScene", mock.Anything, sceneID).Return(scene, nil)
+	repo.On("IsSceneUnlocked", mock.Anything, userID, sceneID).Return(false, nil)
+	insufficientErr := apperr.New(402, "insufficient_funds", "not enough diamonds")
+	wallet.On("Debit", mock.Anything, userID, int32(999), "scene_unlock").Return(insufficientErr)
+
+	err := svc.UnlockScene(context.Background(), userID, sceneID)
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "insufficient_funds", appErr.Code)
+	repo.AssertNotCalled(t, "UnlockScene", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestService_ListStoryScenes_MarksLockStateFromUnlockedSet(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, storyID := uuid.New(), uuid.New()
+	freeSceneID, paidLockedID, paidUnlockedID := uuid.New(), uuid.New(), uuid.New()
+	cost := int32(25)
+
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID}, nil)
+	repo.On("ListScenesByStory", mock.Anything, storyID).Return([]Scene{
+		{ID: freeSceneID, OrderIndex: 0},
+		{ID: paidLockedID, OrderIndex: 1, UnlockCostDiamonds: &cost},
+		{ID: paidUnlockedID, OrderIndex: 2, UnlockCostDiamonds: &cost},
+	}, nil)
+	repo.On("ListUnlockedSceneIDs", mock.Anything, userID).Return(map[uuid.UUID]bool{paidUnlockedID: true}, nil)
+
+	scenes, unlocked, err := svc.ListStoryScenes(context.Background(), userID, storyID)
+
+	require.NoError(t, err)
+	require.Len(t, scenes, 3)
+	responses := toSceneSummaryResponses(scenes, unlocked)
+	assert.True(t, responses[0].IsUnlocked)
+	assert.False(t, responses[1].IsUnlocked)
+	assert.True(t, responses[2].IsUnlocked)
+}
+
+func TestService_ListMyProgress_MarksFinishedFromOrderIndex(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID := uuid.New()
+	summaries := []ProgressSummary{
+		{Story: Story{ID: uuid.New(), Title: "In progress"}, CurrentOrderIndex: 1, TotalScenes: 5},
+		{Story: Story{ID: uuid.New(), Title: "Finished"}, CurrentOrderIndex: 4, TotalScenes: 5},
+	}
+	repo.On("ListProgressByUser", mock.Anything, userID).Return(summaries, nil)
+
+	got, err := svc.ListMyProgress(context.Background(), userID)
+
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	responses := toProgressSummaryResponses(got)
+	assert.False(t, responses[0].IsFinished)
+	assert.True(t, responses[1].IsFinished)
 }
 
 func TestToSceneResponse_PreservesDialogueScript(t *testing.T) {

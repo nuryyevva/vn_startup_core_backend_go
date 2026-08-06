@@ -7,8 +7,10 @@ package sqlc
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createPlayerProgress = `-- name: CreatePlayerProgress :one
@@ -56,6 +58,75 @@ func (q *Queries) GetPlayerProgress(ctx context.Context, arg GetPlayerProgressPa
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listPlayerProgressByUser = `-- name: ListPlayerProgressByUser :many
+SELECT
+    s.id AS story_id,
+    s.title AS story_title,
+    s.description AS story_description,
+    s.cover_url AS story_cover_url,
+    s.genre AS story_genre,
+    s.status AS story_status,
+    s.created_at AS story_created_at,
+    pp.current_scene_id,
+    pp.choices_made,
+    pp.updated_at,
+    sc.order_index AS current_order_index,
+    (SELECT COUNT(*) FROM scenes WHERE scenes.story_id = s.id)::int AS total_scenes
+FROM player_progress pp
+JOIN stories s ON s.id = pp.story_id
+JOIN scenes sc ON sc.id = pp.current_scene_id
+WHERE pp.user_id = $1
+ORDER BY pp.updated_at DESC
+`
+
+type ListPlayerProgressByUserRow struct {
+	StoryID           uuid.UUID   `json:"story_id"`
+	StoryTitle        string      `json:"story_title"`
+	StoryDescription  pgtype.Text `json:"story_description"`
+	StoryCoverUrl     pgtype.Text `json:"story_cover_url"`
+	StoryGenre        string      `json:"story_genre"`
+	StoryStatus       string      `json:"story_status"`
+	StoryCreatedAt    time.Time   `json:"story_created_at"`
+	CurrentSceneID    uuid.UUID   `json:"current_scene_id"`
+	ChoicesMade       []byte      `json:"choices_made"`
+	UpdatedAt         time.Time   `json:"updated_at"`
+	CurrentOrderIndex int32       `json:"current_order_index"`
+	TotalScenes       int32       `json:"total_scenes"`
+}
+
+func (q *Queries) ListPlayerProgressByUser(ctx context.Context, userID uuid.UUID) ([]ListPlayerProgressByUserRow, error) {
+	rows, err := q.db.Query(ctx, listPlayerProgressByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPlayerProgressByUserRow{}
+	for rows.Next() {
+		var i ListPlayerProgressByUserRow
+		if err := rows.Scan(
+			&i.StoryID,
+			&i.StoryTitle,
+			&i.StoryDescription,
+			&i.StoryCoverUrl,
+			&i.StoryGenre,
+			&i.StoryStatus,
+			&i.StoryCreatedAt,
+			&i.CurrentSceneID,
+			&i.ChoicesMade,
+			&i.UpdatedAt,
+			&i.CurrentOrderIndex,
+			&i.TotalScenes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updatePlayerProgress = `-- name: UpdatePlayerProgress :one

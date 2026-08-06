@@ -19,9 +19,14 @@ type Repository interface {
 	GetStory(ctx context.Context, id uuid.UUID) (Story, error)
 	GetFirstScene(ctx context.Context, storyID uuid.UUID) (Scene, error)
 	GetScene(ctx context.Context, id uuid.UUID) (Scene, error)
+	ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error)
 	ListChoices(ctx context.Context, sceneID uuid.UUID) ([]Choice, error)
 	GetChoice(ctx context.Context, id uuid.UUID) (Choice, error)
 	GetProgress(ctx context.Context, userID, storyID uuid.UUID) (Progress, error)
+	ListProgressByUser(ctx context.Context, userID uuid.UUID) ([]ProgressSummary, error)
 	CreateProgress(ctx context.Context, userID, storyID, sceneID uuid.UUID) (Progress, error)
 	UpdateProgress(ctx context.Context, userID, storyID, sceneID uuid.UUID, choicesMade []uuid.UUID) (Progress, error)
+	IsSceneUnlocked(ctx context.Context, userID, sceneID uuid.UUID) (bool, error)
+	ListUnlockedSceneIDs(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]bool, error)
+	UnlockScene(ctx context.Context, userID, sceneID uuid.UUID) error
 }

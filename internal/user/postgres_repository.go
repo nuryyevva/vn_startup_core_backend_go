@@ -34,12 +34,12 @@ func (r *PostgresRepository) GetProfile(ctx context.Context, userID uuid.UUID) (
 
 func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID uuid.UUID, input UpdateProfileInput) (Profile, error) {
 	params := sqlc.UpdateUserProfileParams{
-		UserID:      userID,
-		DisplayName: textFromPtr(input.DisplayName),
-		Gender:      textFromPtr(input.Gender),
-		Theme:       textFromPtr(input.Theme),
-		Language:    textFromPtr(input.Language),
-		Hobbies:     input.Hobbies,
+		UserID:         userID,
+		DisplayName:    textFromPtr(input.DisplayName),
+		Gender:         textFromPtr(input.Gender),
+		Theme:          textFromPtr(input.Theme),
+		Language:       textFromPtr(input.Language),
+		FavoriteGenres: input.FavoriteGenres,
 	}
 
 	updated, err := r.queries.UpdateUserProfile(ctx, params)
@@ -72,14 +72,15 @@ func ptrFromText(t pgtype.Text) *string {
 
 func toDomainProfile(row sqlc.GetUserWithProfileRow) Profile {
 	return Profile{
-		UserID:      row.ID,
-		Email:       row.Email,
-		Role:        row.Role,
-		DisplayName: ptrFromText(row.DisplayName),
-		Gender:      ptrFromText(row.Gender),
-		Hobbies:     row.Hobbies,
-		Theme:       row.Theme,
-		Language:    row.Language,
-		UpdatedAt:   row.UpdatedAt,
+		UserID:         row.ID,
+		Email:          row.Email,
+		Role:           row.Role,
+		CreatedAt:      row.CreatedAt,
+		DisplayName:    ptrFromText(row.DisplayName),
+		Gender:         ptrFromText(row.Gender),
+		FavoriteGenres: row.FavoriteGenres,
+		Theme:          row.Theme,
+		Language:       row.Language,
+		UpdatedAt:      row.UpdatedAt,
 	}
 }
