@@ -16,9 +16,12 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-// RegisterRoutes wires the story endpoints onto router, gated by auth.
+// RegisterRoutes wires the story endpoints onto router, gated by auth except
+// for GET /stories: the catalog is public so guest mode (client-side only,
+// no backend session) can still browse it, and listStories never reads
+// user identity anyway.
 func (h *Handler) RegisterRoutes(router fiber.Router, auth fiber.Handler) {
-	router.Get("/stories", auth, h.listStories)
+	router.Get("/stories", h.listStories)
 	router.Get("/progress", auth, h.listMyProgress)
 	router.Get("/stories/:id/progress", auth, h.getProgress)
 	router.Get("/stories/:id/scenes", auth, h.listStoryScenes)
