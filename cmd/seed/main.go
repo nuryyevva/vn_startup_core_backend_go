@@ -8,10 +8,11 @@
 // into a fresh database.
 //
 // It is idempotent (every row uses a fixed UUID and INSERT ... ON CONFLICT
-// DO NOTHING), so it's safe to run more than once against the same
-// database, and is not part of golang-migrate's schema migrations — it
-// seeds data, not schema, and must never run against a production
-// database.
+// DO UPDATE), so it's safe — and expected — to re-run after editing the
+// content below; existing rows are updated in place rather than skipped,
+// which is what makes it useful for iterating on art/audio URLs. It is not
+// part of golang-migrate's schema migrations — it seeds data, not schema,
+// and must never run against a production database.
 package main
 
 import (
@@ -84,6 +85,8 @@ type scene struct {
 	orderIndex         int
 	backgroundURL      string
 	characterID        *uuid.UUID
+	characterSpriteURL *string
+	backgroundMusicURL *string
 	dialogueScript     string // JSON array literal
 	freeDialogEnabled  bool
 	dialogLimitType    *string // "time" | "messages" | nil
@@ -111,10 +114,16 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Every insert below is a real upsert (ON CONFLICT DO UPDATE), not just
+	// ON CONFLICT DO NOTHING — this command is meant to be re-run as sample
+	// content evolves (e.g. adding art/audio URLs), not only to be safe
+	// against re-running with unchanged data.
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO stories (id, title, description, cover_url, genre, status, is_published)
 		 VALUES ($1, $2, $3, $4, $5, $6, true)
-		 ON CONFLICT (id) DO NOTHING`,
+		 ON CONFLICT (id) DO UPDATE SET
+		     title = EXCLUDED.title, description = EXCLUDED.description, cover_url = EXCLUDED.cover_url,
+		     genre = EXCLUDED.genre, status = EXCLUDED.status`,
 		s.id, s.title, s.description, s.coverURL, s.genre, s.status,
 	); err != nil {
 		return fmt.Errorf("insert story: %w", err)
@@ -122,10 +131,15 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 
 	for _, sc := range s.scenes {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-			 ON CONFLICT (id) DO NOTHING`,
-			sc.id, s.id, sc.orderIndex, sc.backgroundURL, sc.characterID,
+			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, character_sprite_url, background_music_url, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			 ON CONFLICT (id) DO UPDATE SET
+			     order_index = EXCLUDED.order_index, background_url = EXCLUDED.background_url,
+			     character_id = EXCLUDED.character_id, character_sprite_url = EXCLUDED.character_sprite_url,
+			     background_music_url = EXCLUDED.background_music_url, dialogue_script = EXCLUDED.dialogue_script,
+			     free_dialog_enabled = EXCLUDED.free_dialog_enabled, dialog_limit_type = EXCLUDED.dialog_limit_type,
+			     dialog_limit_value = EXCLUDED.dialog_limit_value, unlock_cost_diamonds = EXCLUDED.unlock_cost_diamonds`,
+			sc.id, s.id, sc.orderIndex, sc.backgroundURL, sc.characterID, sc.characterSpriteURL, sc.backgroundMusicURL,
 			[]byte(sc.dialogueScript), sc.freeDialogEnabled, sc.dialogLimitType, sc.dialogLimitValue, sc.unlockCostDiamonds,
 		); err != nil {
 			return fmt.Errorf("insert scene %s: %w", sc.id, err)
@@ -136,7 +150,9 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO choices (id, scene_id, text, is_paid, cost_diamonds, next_scene_id)
 			 VALUES ($1, $2, $3, $4, $5, $6)
-			 ON CONFLICT (id) DO NOTHING`,
+			 ON CONFLICT (id) DO UPDATE SET
+			     text = EXCLUDED.text, is_paid = EXCLUDED.is_paid, cost_diamonds = EXCLUDED.cost_diamonds,
+			     next_scene_id = EXCLUDED.next_scene_id`,
 			c.id, c.sceneID, c.text, c.isPaid, c.costDiamonds, c.nextSceneID,
 		); err != nil {
 			return fmt.Errorf("insert choice %s: %w", c.id, err)
@@ -149,8 +165,8 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-// Fixed IDs so re-running this command is idempotent (ON CONFLICT (id) DO
-// NOTHING above) instead of accumulating duplicate rows.
+// Fixed IDs so re-running this command upserts the same rows (ON CONFLICT
+// (id) DO UPDATE above) instead of accumulating duplicates.
 var (
 	// Story 1: Little Red Riding Hood (Charles Perrault / Brothers Grimm —
 	// public domain fairy tale).
@@ -177,6 +193,47 @@ var (
 	aliceChoice2Next = uuid.MustParse("22222222-2222-2222-2222-222222222223")
 )
 
+// Placeholder art/audio for the two sample stories, so the scene player
+// actually has something to render instead of a gray silhouette on a black
+// screen — there's no content-authoring pipeline yet (see the file's top
+// comment), so these are simply real URLs to public-domain/openly-licensed
+// media on Wikimedia Commons, linked via its stable Special:FilePath
+// redirect. When real story assets exist, replace these with whatever
+// storage scheme is chosen then (object storage + CDN, per
+// infrastructure-sizing notes) — nothing downstream cares that these are
+// hotlinked Commons URLs today.
+const (
+	// Little Red Riding Hood — illustrations by Walter Crane (1875) and
+	// Gustave Doré (public domain); "Knocking on wood or door.ogg" and
+	// "Satie Gymnopedie No. 3" recording are both public domain (pdsounds.org
+	// via Wikimedia user Fæ; Satie died 1925, composition and this specific
+	// recording are both PD).
+	ridingHoodHomeBackground    = "https://upload.wikimedia.org/wikipedia/commons/7/71/WalterCrane%2CLittleRedRidingHood-1.png"
+	ridingHoodForestBackground  = "https://upload.wikimedia.org/wikipedia/commons/4/44/WalterCrane%2CLittle_Red_Riding_Hood-3.png"
+	ridingHoodCottageBackground = "https://upload.wikimedia.org/wikipedia/commons/4/4d/WalterCrane%2CLittle_Red_Riding_Hood-5.png"
+	ridingHoodWolfSprite        = "https://upload.wikimedia.org/wikipedia/commons/b/bf/GustaveDore_She_was_astonished_to_see_how_her_grandmother_looked.1.jpg"
+	ridingHoodDoorKnockSfx      = "https://upload.wikimedia.org/wikipedia/commons/1/1c/Knocking_on_wood_or_door.ogg"
+	ridingHoodBackgroundMusic   = "https://upload.wikimedia.org/wikipedia/commons/e/e1/Satie_Gymnopedie_No._3_for_piano_solo_01.wav"
+	// The book's own cover plate — not the wolf/bed engraving used above,
+	// so the library grid doesn't repeat the same image as both cover and
+	// sprite.
+	ridingHoodCover = "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e6/WalterCrane%2CLittleRedRidingHood-0.png/500px-WalterCrane%2CLittleRedRidingHood-0.png"
+
+	// Alice's Adventures in Wonderland — John Tenniel's original 1865
+	// engravings (public domain, author died 1914); "Clock ticking.ogg" is
+	// public domain (pdsounds.org via Fæ); the Debussy recording is CC BY
+	// 3.0, performed by Laurens Goedhart — attribution required if reused
+	// elsewhere.
+	aliceRiverbankBackground  = "https://upload.wikimedia.org/wikipedia/commons/8/83/Alice-white-rabbit.jpg"
+	aliceRabbitHoleBackground = "https://upload.wikimedia.org/wikipedia/commons/3/3a/Alice_par_John_Tenniel_03.png"
+	aliceDoorsHallBackground  = "https://upload.wikimedia.org/wikipedia/commons/6/63/Alice_par_John_Tenniel_04.png"
+	aliceRabbitSprite         = "https://upload.wikimedia.org/wikipedia/commons/e/e4/White_Rabbit_Illustration.png"
+	aliceClockTickSfx         = "https://upload.wikimedia.org/wikipedia/commons/5/56/Clock_ticking.ogg"
+	// CC BY 3.0 — Laurens Goedhart, https://soundcloud.com/laurensgoedhart/claude-debussys-clair-de-lune
+	aliceBackgroundMusic = "https://upload.wikimedia.org/wikipedia/commons/b/be/Clair_de_lune_%28Claude_Debussy%29_Suite_bergamasque.ogg"
+	aliceCover           = "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Alice_par_John_Tenniel_02.png/500px-Alice_par_John_Tenniel_02.png"
+)
+
 func sampleStories() []story {
 	return []story{redRidingHoodStory(), aliceStory()}
 }
@@ -186,32 +243,36 @@ func redRidingHoodStory() story {
 		id:          redRidingHoodStoryID,
 		title:       "Красная Шапочка",
 		description: "Классическая сказка о девочке в красной шапочке, тропинке через лес и Волке, который выдаёт себя за бабушку.",
-		coverURL:    "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Gustave_Dor%C3%A9_-_Le_Petit_Chaperon_rouge.jpg/400px-Gustave_Dor%C3%A9_-_Le_Petit_Chaperon_rouge.jpg",
+		coverURL:    ridingHoodCover,
 		genre:       "fantasy",
 		status:      "completed",
 		scenes: []scene{
 			{
-				id:                redRidingHoodScene1ID,
-				orderIndex:        0,
-				backgroundURL:     "https://example.com/backgrounds/riding-hood/home.jpg",
-				dialogueScript:    `[{"speaker":"narrator","text":"Жила-была на свете маленькая девочка, и мать любила её без памяти, а бабушка ещё больше."},{"speaker":"Мама","text":"Отнеси бабушке пирожок и горшочек масла, да не задерживайся в лесу."}]`,
-				freeDialogEnabled: false,
+				id:                 redRidingHoodScene1ID,
+				orderIndex:         0,
+				backgroundURL:      ridingHoodHomeBackground,
+				backgroundMusicURL: strPtr(ridingHoodBackgroundMusic),
+				dialogueScript:     `[{"speaker":"narrator","text":"Жила-была на свете маленькая девочка, и мать любила её без памяти, а бабушка ещё больше."},{"speaker":"Мама","text":"Отнеси бабушке пирожок и горшочек масла, да не задерживайся в лесу."}]`,
+				freeDialogEnabled:  false,
 			},
 			{
-				id:                redRidingHoodScene2ID,
-				orderIndex:        1,
-				backgroundURL:     "https://example.com/backgrounds/riding-hood/forest.jpg",
-				characterID:       uuidPtr(redRidingHoodWolfID),
-				dialogueScript:    `[{"speaker":"narrator","text":"На тропинке девочку встретил Волк. Он был не прочь узнать, куда она идёт."},{"speaker":"Волк","text":"Куда путь держишь, дитя, в такой ранний час?"}]`,
-				freeDialogEnabled: true,
-				dialogLimitType:   strPtr("messages"),
-				dialogLimitValue:  i32Ptr(5),
+				id:                 redRidingHoodScene2ID,
+				orderIndex:         1,
+				backgroundURL:      ridingHoodForestBackground,
+				characterID:        uuidPtr(redRidingHoodWolfID),
+				characterSpriteURL: strPtr(ridingHoodWolfSprite),
+				backgroundMusicURL: strPtr(ridingHoodBackgroundMusic),
+				dialogueScript:     `[{"speaker":"narrator","text":"На тропинке девочку встретил Волк. Он был не прочь узнать, куда она идёт."},{"speaker":"Волк","text":"Куда путь держишь, дитя, в такой ранний час?"}]`,
+				freeDialogEnabled:  true,
+				dialogLimitType:    strPtr("messages"),
+				dialogLimitValue:   i32Ptr(5),
 			},
 			{
 				id:                 redRidingHoodScene3ID,
 				orderIndex:         2,
-				backgroundURL:      "https://example.com/backgrounds/riding-hood/cottage.jpg",
-				dialogueScript:     `[{"speaker":"narrator","text":"Девочка постучала в дверь бабушкиного домика. \"Кто там?\" — раздался странно низкий голос."}]`,
+				backgroundURL:      ridingHoodCottageBackground,
+				backgroundMusicURL: strPtr(ridingHoodBackgroundMusic),
+				dialogueScript:     `[{"speaker":"narrator","text":"Девочка постучала в дверь бабушкиного домика.","sfx_url":"` + ridingHoodDoorKnockSfx + `"},{"speaker":"narrator","text":"\"Кто там?\" — раздался странно низкий голос."}]`,
 				freeDialogEnabled:  false,
 				unlockCostDiamonds: i32Ptr(25),
 			},
@@ -250,31 +311,35 @@ func aliceStory() story {
 		id:          aliceStoryID,
 		title:       "Алиса в Стране чудес",
 		description: "Скучающая на берегу реки Алиса замечает спешащего Белого Кролика с карманными часами — и следует за ним в кроличью нору.",
-		coverURL:    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Alice_par_John_Tenniel_02.png/400px-Alice_par_John_Tenniel_02.png",
+		coverURL:    aliceCover,
 		genre:       "adventure",
 		status:      "ongoing",
 		scenes: []scene{
 			{
-				id:                aliceScene1ID,
-				orderIndex:        0,
-				backgroundURL:     "https://example.com/backgrounds/alice/riverbank.jpg",
-				dialogueScript:    `[{"speaker":"narrator","text":"Алисе наскучило сидеть без дела на берегу реки рядом с сестрой, у которой не было ни картинок, ни разговоров в книге."},{"speaker":"narrator","text":"Вдруг мимо пробежал Белый Кролик с розовыми глазами."},{"speaker":"Белый Кролик","text":"Ах, боже мой, боже мой! Я опаздываю!"}]`,
-				freeDialogEnabled: false,
+				id:                 aliceScene1ID,
+				orderIndex:         0,
+				backgroundURL:      aliceRiverbankBackground,
+				backgroundMusicURL: strPtr(aliceBackgroundMusic),
+				dialogueScript:     `[{"speaker":"narrator","text":"Алисе наскучило сидеть без дела на берегу реки рядом с сестрой, у которой не было ни картинок, ни разговоров в книге."},{"speaker":"narrator","text":"Вдруг мимо пробежал Белый Кролик с розовыми глазами."},{"speaker":"Белый Кролик","text":"Ах, боже мой, боже мой! Я опаздываю!","sfx_url":"` + aliceClockTickSfx + `"}]`,
+				freeDialogEnabled:  false,
 			},
 			{
-				id:                aliceScene2ID,
-				orderIndex:        1,
-				backgroundURL:     "https://example.com/backgrounds/alice/rabbit-hole.jpg",
-				characterID:       uuidPtr(aliceRabbitID),
-				dialogueScript:    `[{"speaker":"narrator","text":"Алиса нырнула вслед за Кроликом в нору, даже не подумав, как же она будет выбираться обратно."},{"speaker":"narrator","text":"Нора шла прямо, как туннель, а потом внезапно обрывалась вниз — и падение оказалось на удивление медленным."}]`,
-				freeDialogEnabled: true,
-				dialogLimitType:   strPtr("time"),
-				dialogLimitValue:  i32Ptr(120),
+				id:                 aliceScene2ID,
+				orderIndex:         1,
+				backgroundURL:      aliceRabbitHoleBackground,
+				characterID:        uuidPtr(aliceRabbitID),
+				characterSpriteURL: strPtr(aliceRabbitSprite),
+				backgroundMusicURL: strPtr(aliceBackgroundMusic),
+				dialogueScript:     `[{"speaker":"narrator","text":"Алиса нырнула вслед за Кроликом в нору, даже не подумав, как же она будет выбираться обратно."},{"speaker":"narrator","text":"Нора шла прямо, как туннель, а потом внезапно обрывалась вниз — и падение оказалось на удивление медленным."}]`,
+				freeDialogEnabled:  true,
+				dialogLimitType:    strPtr("time"),
+				dialogLimitValue:   i32Ptr(120),
 			},
 			{
 				id:                 aliceScene3ID,
 				orderIndex:         2,
-				backgroundURL:      "https://example.com/backgrounds/alice/garden-door.jpg",
+				backgroundURL:      aliceDoorsHallBackground,
+				backgroundMusicURL: strPtr(aliceBackgroundMusic),
 				dialogueScript:     `[{"speaker":"narrator","text":"Алиса оказалась в длинном низком зале, вдоль которого стоял ряд запертых дверей, а на стеклянном столике лежал крошечный золотой ключик."}]`,
 				freeDialogEnabled:  false,
 				unlockCostDiamonds: i32Ptr(15),

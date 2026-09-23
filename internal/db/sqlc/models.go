@@ -63,6 +63,8 @@ type Scene struct {
 	DialogLimitValue   pgtype.Int4 `json:"dialog_limit_value"`
 	CreatedAt          time.Time   `json:"created_at"`
 	UnlockCostDiamonds pgtype.Int4 `json:"unlock_cost_diamonds"`
+	CharacterSpriteUrl pgtype.Text `json:"character_sprite_url"`
+	BackgroundMusicUrl pgtype.Text `json:"background_music_url"`
 }
 
 type SceneUnlock struct {

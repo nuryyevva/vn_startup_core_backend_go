@@ -30,6 +30,8 @@ type Scene struct {
 	DialogLimitValue   *int32
 	CreatedAt          time.Time
 	UnlockCostDiamonds *int32
+	CharacterSpriteURL *string
+	BackgroundMusicURL *string
 }
 
 type Choice struct {
@@ -130,6 +132,8 @@ type SceneResponse struct {
 	DialogLimitType    *string          `json:"dialog_limit_type,omitempty"`
 	DialogLimitValue   *int32           `json:"dialog_limit_value,omitempty"`
 	UnlockCostDiamonds *int32           `json:"unlock_cost_diamonds,omitempty"`
+	CharacterSpriteURL *string          `json:"character_sprite_url,omitempty"`
+	BackgroundMusicURL *string          `json:"background_music_url,omitempty"`
 	Choices            []ChoiceResponse `json:"choices"`
 }
 
@@ -187,6 +191,8 @@ func toSceneResponse(s Scene, choices []Choice) SceneResponse {
 		DialogLimitType:    s.DialogLimitType,
 		DialogLimitValue:   s.DialogLimitValue,
 		UnlockCostDiamonds: s.UnlockCostDiamonds,
+		CharacterSpriteURL: s.CharacterSpriteURL,
+		BackgroundMusicURL: s.BackgroundMusicURL,
 		Choices:            choiceResponses,
 	}
 }

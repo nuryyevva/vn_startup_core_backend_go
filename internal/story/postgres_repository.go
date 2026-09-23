@@ -271,6 +271,8 @@ func toDomainScene(s sqlc.Scene) Scene {
 		DialogLimitValue:   ptrFromInt4(s.DialogLimitValue),
 		CreatedAt:          s.CreatedAt,
 		UnlockCostDiamonds: ptrFromInt4(s.UnlockCostDiamonds),
+		CharacterSpriteURL: ptrFromText(s.CharacterSpriteUrl),
+		BackgroundMusicURL: ptrFromText(s.BackgroundMusicUrl),
 	}
 }
 
