@@ -12,6 +12,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countUserDialogMessagesBySender = `-- name: CountUserDialogMessagesBySender :one
+SELECT COUNT(*) FROM dialog_messages dm
+JOIN dialog_sessions ds ON ds.id = dm.session_id
+WHERE ds.user_id = $1 AND dm.sender = $2
+`
+
+type CountUserDialogMessagesBySenderParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Sender string    `json:"sender"`
+}
+
+func (q *Queries) CountUserDialogMessagesBySender(ctx context.Context, arg CountUserDialogMessagesBySenderParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countUserDialogMessagesBySender, arg.UserID, arg.Sender)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createDialogMessage = `-- name: CreateDialogMessage :one
 INSERT INTO dialog_messages (session_id, sender, text, cost_diamonds)
 VALUES ($1, $2, $3, $4)

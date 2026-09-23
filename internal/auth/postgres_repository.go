@@ -83,6 +83,13 @@ func (r *PostgresRepository) GetUserByID(ctx context.Context, id uuid.UUID) (Use
 	return toDomainUser(dbUser), nil
 }
 
+func (r *PostgresRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	if err := r.queries.UpdateUserPasswordHash(ctx, sqlc.UpdateUserPasswordHashParams{ID: id, PasswordHash: passwordHash}); err != nil {
+		return fmt.Errorf("update user password hash: %w", err)
+	}
+	return nil
+}
+
 func toDomainUser(u sqlc.User) User {
 	return User{
 		ID:           u.ID,

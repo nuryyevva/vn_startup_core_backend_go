@@ -31,6 +31,11 @@ func (m *mockRepository) Debit(ctx context.Context, userID uuid.UUID, amount int
 	return args.Get(0).(Transaction), args.Error(1)
 }
 
+func (m *mockRepository) GetTotalSpent(ctx context.Context, userID uuid.UUID) (int64, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 func TestService_Balance(t *testing.T) {
 	repo := new(mockRepository)
 	svc := NewService(repo)

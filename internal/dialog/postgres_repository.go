@@ -118,6 +118,17 @@ func (r *PostgresRepository) ListMessages(ctx context.Context, sessionID uuid.UU
 	return out, nil
 }
 
+func (r *PostgresRepository) CountUserMessages(ctx context.Context, userID uuid.UUID, sender string) (int64, error) {
+	count, err := r.queries.CountUserDialogMessagesBySender(ctx, sqlc.CountUserDialogMessagesBySenderParams{
+		UserID: userID,
+		Sender: sender,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("count user dialog messages by sender: %w", err)
+	}
+	return count, nil
+}
+
 func int4FromPtr(v *int32) pgtype.Int4 {
 	if v == nil {
 		return pgtype.Int4{}

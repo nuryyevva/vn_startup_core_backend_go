@@ -53,10 +53,11 @@ func TestStoryIntegration_ProgressAndChoice(t *testing.T) {
 	repo := story.NewPostgresRepository(pool)
 	svc := story.NewService(repo, stubWallet{}, stubPublisher{}, nil)
 
-	stories, err := svc.ListPublishedStories(ctx)
+	page, err := svc.ListPublishedStories(ctx, nil, 1, 20)
 	require.NoError(t, err)
-	require.Len(t, stories, 1)
-	assert.Equal(t, storyID, stories[0].ID)
+	require.Len(t, page.Stories, 1)
+	assert.Equal(t, storyID, page.Stories[0].ID)
+	assert.Equal(t, int64(1), page.Total)
 
 	progress, err := svc.GetOrCreateProgress(ctx, player.ID, storyID)
 	require.NoError(t, err)

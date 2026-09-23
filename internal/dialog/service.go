@@ -216,6 +216,13 @@ func (s *Service) endSessionInternal(ctx context.Context, session Session, reaso
 	return ended
 }
 
+// CountUserMessagesSent returns how many free-dialog messages userID has
+// ever sent (sender=user), across every session — used by the achievement
+// module.
+func (s *Service) CountUserMessagesSent(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return s.repo.CountUserMessages(ctx, userID, SenderUser)
+}
+
 // EndExpiredSessions is invoked periodically by the scheduler to close
 // active time-limited sessions whose deadline has passed.
 func (s *Service) EndExpiredSessions(ctx context.Context) (int, error) {

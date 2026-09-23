@@ -51,6 +51,11 @@ func (m *mockRepository) ListMessages(ctx context.Context, sessionID uuid.UUID) 
 	return args.Get(0).([]Message), args.Error(1)
 }
 
+func (m *mockRepository) CountUserMessages(ctx context.Context, userID uuid.UUID, sender string) (int64, error) {
+	args := m.Called(ctx, userID, sender)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 type mockSceneProvider struct {
 	mock.Mock
 }

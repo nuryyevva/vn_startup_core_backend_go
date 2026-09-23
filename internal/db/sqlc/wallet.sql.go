@@ -36,6 +36,19 @@ func (q *Queries) CreateWalletTransaction(ctx context.Context, arg CreateWalletT
 	return i, err
 }
 
+const getTotalDiamondsSpent = `-- name: GetTotalDiamondsSpent :one
+SELECT COALESCE(-SUM(amount), 0)::bigint AS total_spent
+FROM wallet_transactions
+WHERE user_id = $1 AND amount < 0
+`
+
+func (q *Queries) GetTotalDiamondsSpent(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, getTotalDiamondsSpent, userID)
+	var total_spent int64
+	err := row.Scan(&total_spent)
+	return total_spent, err
+}
+
 const getWalletBalance = `-- name: GetWalletBalance :one
 SELECT COALESCE(SUM(amount), 0)::bigint AS balance
 FROM wallet_transactions

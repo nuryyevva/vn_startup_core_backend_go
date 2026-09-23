@@ -8,9 +8,13 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	AddStoryBookmark(ctx context.Context, arg AddStoryBookmarkParams) error
+	CountPublishedStories(ctx context.Context, genre pgtype.Text) (int64, error)
+	CountUserDialogMessagesBySender(ctx context.Context, arg CountUserDialogMessagesBySenderParams) (int64, error)
 	CreateDialogMessage(ctx context.Context, arg CreateDialogMessageParams) (DialogMessage, error)
 	CreateDialogSession(ctx context.Context, arg CreateDialogSessionParams) (DialogSession, error)
 	CreatePlayerProgress(ctx context.Context, arg CreatePlayerProgressParams) (PlayerProgress, error)
@@ -26,27 +30,35 @@ type Querier interface {
 	GetPlayerProgress(ctx context.Context, arg GetPlayerProgressParams) (PlayerProgress, error)
 	GetScene(ctx context.Context, id uuid.UUID) (Scene, error)
 	GetStory(ctx context.Context, id uuid.UUID) (Story, error)
+	GetTotalDiamondsSpent(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error)
+	GetUserStats(ctx context.Context, userID uuid.UUID) (UserStat, error)
 	GetUserWithProfile(ctx context.Context, id uuid.UUID) (GetUserWithProfileRow, error)
 	GetWalletBalance(ctx context.Context, userID uuid.UUID) (int64, error)
 	IncrementDialogSessionMessageCount(ctx context.Context, id uuid.UUID) (DialogSession, error)
 	IsSceneUnlocked(ctx context.Context, arg IsSceneUnlockedParams) (bool, error)
+	ListBookmarkedStories(ctx context.Context, userID uuid.UUID) ([]Story, error)
 	ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]Choice, error)
 	ListDialogMessages(ctx context.Context, sessionID uuid.UUID) ([]DialogMessage, error)
 	ListExpiredTimeLimitedSessions(ctx context.Context) ([]DialogSession, error)
 	ListPlayerProgressByUser(ctx context.Context, userID uuid.UUID) ([]ListPlayerProgressByUserRow, error)
-	ListPublishedStories(ctx context.Context) ([]Story, error)
+	ListPublishedStoriesPage(ctx context.Context, arg ListPublishedStoriesPageParams) ([]Story, error)
 	ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error)
+	ListUnlockedAchievements(ctx context.Context, userID uuid.UUID) ([]UserAchievement, error)
 	ListUnlockedSceneIDsByUser(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	// Advisory transaction-scoped lock keyed by user id. wallet_transactions has
 	// no balance row to lock with SELECT ... FOR UPDATE, and locking existing
 	// rows wouldn't block a concurrent INSERT anyway, so we serialize
 	// read-balance-then-insert per user with an advisory lock instead.
 	LockWallet(ctx context.Context, userID string) error
+	RemoveStoryBookmark(ctx context.Context, arg RemoveStoryBookmarkParams) error
+	UnlockAchievement(ctx context.Context, arg UnlockAchievementParams) (UserAchievement, error)
 	UpdatePlayerProgress(ctx context.Context, arg UpdatePlayerProgressParams) (PlayerProgress, error)
+	UpdateUserPasswordHash(ctx context.Context, arg UpdateUserPasswordHashParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UserProfile, error)
+	UpsertUserStatsHeartbeat(ctx context.Context, arg UpsertUserStatsHeartbeatParams) (UserStat, error)
 }
 
 var _ Querier = (*Queries)(nil)

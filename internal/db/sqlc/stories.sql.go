@@ -9,7 +9,36 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const addStoryBookmark = `-- name: AddStoryBookmark :exec
+INSERT INTO story_bookmarks (user_id, story_id) VALUES ($1, $2)
+ON CONFLICT (user_id, story_id) DO NOTHING
+`
+
+type AddStoryBookmarkParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	StoryID uuid.UUID `json:"story_id"`
+}
+
+func (q *Queries) AddStoryBookmark(ctx context.Context, arg AddStoryBookmarkParams) error {
+	_, err := q.db.Exec(ctx, addStoryBookmark, arg.UserID, arg.StoryID)
+	return err
+}
+
+const countPublishedStories = `-- name: CountPublishedStories :one
+SELECT COUNT(*) FROM stories
+WHERE is_published = true
+  AND ($1::text IS NULL OR genre = $1)
+`
+
+func (q *Queries) CountPublishedStories(ctx context.Context, genre pgtype.Text) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublishedStories, genre)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const getFirstSceneOfStory = `-- name: GetFirstSceneOfStory :one
 SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds FROM scenes WHERE story_id = $1 ORDER BY order_index ASC LIMIT 1
@@ -54,12 +83,15 @@ func (q *Queries) GetStory(ctx context.Context, id uuid.UUID) (Story, error) {
 	return i, err
 }
 
-const listPublishedStories = `-- name: ListPublishedStories :many
-SELECT id, title, description, cover_url, is_published, created_at, genre, status FROM stories WHERE is_published = true ORDER BY created_at DESC
+const listBookmarkedStories = `-- name: ListBookmarkedStories :many
+SELECT s.id, s.title, s.description, s.cover_url, s.is_published, s.created_at, s.genre, s.status FROM story_bookmarks b
+JOIN stories s ON s.id = b.story_id
+WHERE b.user_id = $1
+ORDER BY b.created_at DESC
 `
 
-func (q *Queries) ListPublishedStories(ctx context.Context) ([]Story, error) {
-	rows, err := q.db.Query(ctx, listPublishedStories)
+func (q *Queries) ListBookmarkedStories(ctx context.Context, userID uuid.UUID) ([]Story, error) {
+	rows, err := q.db.Query(ctx, listBookmarkedStories, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,4 +117,61 @@ func (q *Queries) ListPublishedStories(ctx context.Context) ([]Story, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const listPublishedStoriesPage = `-- name: ListPublishedStoriesPage :many
+SELECT id, title, description, cover_url, is_published, created_at, genre, status FROM stories
+WHERE is_published = true
+  AND ($1::text IS NULL OR genre = $1)
+ORDER BY created_at DESC
+LIMIT $3 OFFSET $2
+`
+
+type ListPublishedStoriesPageParams struct {
+	Genre       pgtype.Text `json:"genre"`
+	OffsetCount int32       `json:"offset_count"`
+	LimitCount  int32       `json:"limit_count"`
+}
+
+func (q *Queries) ListPublishedStoriesPage(ctx context.Context, arg ListPublishedStoriesPageParams) ([]Story, error) {
+	rows, err := q.db.Query(ctx, listPublishedStoriesPage, arg.Genre, arg.OffsetCount, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Story{}
+	for rows.Next() {
+		var i Story
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.CoverUrl,
+			&i.IsPublished,
+			&i.CreatedAt,
+			&i.Genre,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const removeStoryBookmark = `-- name: RemoveStoryBookmark :exec
+DELETE FROM story_bookmarks WHERE user_id = $1 AND story_id = $2
+`
+
+type RemoveStoryBookmarkParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	StoryID uuid.UUID `json:"story_id"`
+}
+
+func (q *Queries) RemoveStoryBookmark(ctx context.Context, arg RemoveStoryBookmarkParams) error {
+	_, err := q.db.Exec(ctx, removeStoryBookmark, arg.UserID, arg.StoryID)
+	return err
 }

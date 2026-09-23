@@ -17,8 +17,23 @@ type mockRepository struct {
 	mock.Mock
 }
 
-func (m *mockRepository) ListPublishedStories(ctx context.Context) ([]Story, error) {
-	args := m.Called(ctx)
+func (m *mockRepository) ListPublishedStories(ctx context.Context, filter ListStoriesFilter) ([]Story, int64, error) {
+	args := m.Called(ctx, filter)
+	return args.Get(0).([]Story), args.Get(1).(int64), args.Error(2)
+}
+
+func (m *mockRepository) AddBookmark(ctx context.Context, userID, storyID uuid.UUID) error {
+	args := m.Called(ctx, userID, storyID)
+	return args.Error(0)
+}
+
+func (m *mockRepository) RemoveBookmark(ctx context.Context, userID, storyID uuid.UUID) error {
+	args := m.Called(ctx, userID, storyID)
+	return args.Error(0)
+}
+
+func (m *mockRepository) ListBookmarkedStories(ctx context.Context, userID uuid.UUID) ([]Story, error) {
+	args := m.Called(ctx, userID)
 	return args.Get(0).([]Story), args.Error(1)
 }
 
@@ -401,6 +416,91 @@ func TestService_ListMyProgress_MarksFinishedFromOrderIndex(t *testing.T) {
 	responses := toProgressSummaryResponses(got)
 	assert.False(t, responses[0].IsFinished)
 	assert.True(t, responses[1].IsFinished)
+}
+
+func TestService_ListPublishedStories_DefaultsAndClampsPaging(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	stories := []Story{{ID: uuid.New()}}
+	repo.On("ListPublishedStories", mock.Anything, ListStoriesFilter{Limit: defaultPageSize, Offset: 0}).Return(stories, int64(1), nil)
+
+	page, err := svc.ListPublishedStories(context.Background(), nil, 0, 0)
+
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), page.Page)
+	assert.Equal(t, int32(defaultPageSize), page.PageSize)
+	assert.Equal(t, int64(1), page.Total)
+	assert.Equal(t, stories, page.Stories)
+}
+
+func TestService_ListPublishedStories_ClampsOversizedPageSize(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	repo.On("ListPublishedStories", mock.Anything, ListStoriesFilter{Limit: maxPageSize, Offset: maxPageSize * 2}).
+		Return([]Story{}, int64(0), nil)
+
+	page, err := svc.ListPublishedStories(context.Background(), nil, 3, 1000)
+
+	require.NoError(t, err)
+	assert.Equal(t, int32(maxPageSize), page.PageSize)
+}
+
+func TestService_GetPublishedStory_ReturnsPublishedStory(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	storyID := uuid.New()
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID, IsPublished: true}, nil)
+
+	got, err := svc.GetPublishedStory(context.Background(), storyID)
+
+	require.NoError(t, err)
+	assert.Equal(t, storyID, got.ID)
+}
+
+func TestService_GetPublishedStory_HidesUnpublishedStory(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	storyID := uuid.New()
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID, IsPublished: false}, nil)
+
+	_, err := svc.GetPublishedStory(context.Background(), storyID)
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "story_not_found", appErr.Code)
+}
+
+func TestService_Bookmark_StoryNotFound(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, storyID := uuid.New(), uuid.New()
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{}, ErrStoryNotFound)
+
+	err := svc.Bookmark(context.Background(), userID, storyID)
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "story_not_found", appErr.Code)
+	repo.AssertNotCalled(t, "AddBookmark", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestService_Bookmark_AddsWhenStoryExists(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, storyID := uuid.New(), uuid.New()
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID}, nil)
+	repo.On("AddBookmark", mock.Anything, userID, storyID).Return(nil)
+
+	err := svc.Bookmark(context.Background(), userID, storyID)
+
+	require.NoError(t, err)
+	repo.AssertExpectations(t)
 }
 
 func TestToSceneResponse_PreservesDialogueScript(t *testing.T) {

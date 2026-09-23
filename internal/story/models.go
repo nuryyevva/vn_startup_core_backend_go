@@ -85,6 +85,32 @@ func toStoryResponses(stories []Story) []StoryResponse {
 	return out
 }
 
+// StoryPage is one page of ListPublishedStories: the resolved (defaulted,
+// clamped) page/pageSize the service actually used, plus the total count of
+// stories matching the filter so the client knows whether more pages exist.
+type StoryPage struct {
+	Stories  []Story
+	Total    int64
+	Page     int32
+	PageSize int32
+}
+
+type StoryListResponse struct {
+	Items    []StoryResponse `json:"items"`
+	Total    int64           `json:"total"`
+	Page     int32           `json:"page"`
+	PageSize int32           `json:"page_size"`
+}
+
+func toStoryListResponse(p StoryPage) StoryListResponse {
+	return StoryListResponse{
+		Items:    toStoryResponses(p.Stories),
+		Total:    p.Total,
+		Page:     p.Page,
+		PageSize: p.PageSize,
+	}
+}
+
 type ChoiceResponse struct {
 	ID           uuid.UUID  `json:"id"`
 	Text         string     `json:"text"`

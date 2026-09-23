@@ -82,6 +82,12 @@ type Story struct {
 	Status      string      `json:"status"`
 }
 
+type StoryBookmark struct {
+	UserID    uuid.UUID `json:"user_id"`
+	StoryID   uuid.UUID `json:"story_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type User struct {
 	ID           uuid.UUID `json:"id"`
 	Email        string    `json:"email"`
@@ -90,14 +96,31 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type UserAchievement struct {
+	UserID        uuid.UUID `json:"user_id"`
+	AchievementID string    `json:"achievement_id"`
+	UnlockedAt    time.Time `json:"unlocked_at"`
+}
+
 type UserProfile struct {
-	UserID         uuid.UUID   `json:"user_id"`
-	DisplayName    pgtype.Text `json:"display_name"`
-	Gender         pgtype.Text `json:"gender"`
-	FavoriteGenres []string    `json:"favorite_genres"`
-	Theme          string      `json:"theme"`
-	Language       string      `json:"language"`
-	UpdatedAt      time.Time   `json:"updated_at"`
+	UserID                  uuid.UUID   `json:"user_id"`
+	DisplayName             pgtype.Text `json:"display_name"`
+	Gender                  pgtype.Text `json:"gender"`
+	FavoriteGenres          []string    `json:"favorite_genres"`
+	Theme                   string      `json:"theme"`
+	Language                string      `json:"language"`
+	UpdatedAt               time.Time   `json:"updated_at"`
+	NotifyNewChapters       bool        `json:"notify_new_chapters"`
+	NotifyPromotionalOffers bool        `json:"notify_promotional_offers"`
+}
+
+type UserStat struct {
+	UserID              uuid.UUID   `json:"user_id"`
+	TotalReadingSeconds int64       `json:"total_reading_seconds"`
+	DayStreak           int32       `json:"day_streak"`
+	LongestStreak       int32       `json:"longest_streak"`
+	LastActiveDate      pgtype.Date `json:"last_active_date"`
+	UpdatedAt           time.Time   `json:"updated_at"`
 }
 
 type WalletTransaction struct {

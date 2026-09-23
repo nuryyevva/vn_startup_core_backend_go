@@ -39,8 +39,105 @@ func NewService(repo Repository, wallet Wallet, publisher EventPublisher, logger
 	return &Service{repo: repo, wallet: wallet, publisher: publisher, logger: logger}
 }
 
-func (s *Service) ListPublishedStories(ctx context.Context) ([]Story, error) {
-	return s.repo.ListPublishedStories(ctx)
+const (
+	defaultPageSize = 20
+	maxPageSize     = 100
+)
+
+// ListPublishedStories returns one page of the published catalog, optionally
+// filtered by genre. page is 1-based; pageSize <= 0 falls back to
+// defaultPageSize and is clamped to maxPageSize either way, so callers never
+// need to validate these themselves.
+func (s *Service) ListPublishedStories(ctx context.Context, genre *string, page, pageSize int32) (StoryPage, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+
+	stories, total, err := s.repo.ListPublishedStories(ctx, ListStoriesFilter{
+		Genre:  genre,
+		Limit:  pageSize,
+		Offset: (page - 1) * pageSize,
+	})
+	if err != nil {
+		return StoryPage{}, err
+	}
+
+	return StoryPage{Stories: stories, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// Bookmark adds storyID to userID's library. Idempotent: bookmarking an
+// already-bookmarked story succeeds without creating a duplicate row.
+func (s *Service) Bookmark(ctx context.Context, userID, storyID uuid.UUID) error {
+	if _, err := s.repo.GetStory(ctx, storyID); err != nil {
+		if errors.Is(err, ErrStoryNotFound) {
+			return apperr.NotFound("story_not_found", "История не найдена")
+		}
+		return err
+	}
+	return s.repo.AddBookmark(ctx, userID, storyID)
+}
+
+// Unbookmark removes storyID from userID's library. Idempotent: unbookmarking
+// a story that was never bookmarked succeeds without error.
+func (s *Service) Unbookmark(ctx context.Context, userID, storyID uuid.UUID) error {
+	return s.repo.RemoveBookmark(ctx, userID, storyID)
+}
+
+// GetPublishedStory returns a single published story by ID, or
+// story_not_found if it doesn't exist or isn't published — unauthenticated
+// callers (the story catalog is public) must never learn about unpublished
+// stories through this lookup.
+func (s *Service) GetPublishedStory(ctx context.Context, id uuid.UUID) (Story, error) {
+	story, err := s.repo.GetStory(ctx, id)
+	if err != nil {
+		if errors.Is(err, ErrStoryNotFound) {
+			return Story{}, apperr.NotFound("story_not_found", "История не найдена")
+		}
+		return Story{}, err
+	}
+	if !story.IsPublished {
+		return Story{}, apperr.NotFound("story_not_found", "История не найдена")
+	}
+	return story, nil
+}
+
+// ListBookmarks returns userID's bookmarked stories, most recently
+// bookmarked first.
+func (s *Service) ListBookmarks(ctx context.Context, userID uuid.UUID) ([]Story, error) {
+	return s.repo.ListBookmarkedStories(ctx, userID)
+}
+
+// CountFinishedStories returns how many stories userID has completed, using
+// the same "on the last scene" rule as ProgressSummaryResponse.IsFinished —
+// used by the achievement module.
+func (s *Service) CountFinishedStories(ctx context.Context, userID uuid.UUID) (int32, error) {
+	summaries, err := s.repo.ListProgressByUser(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	var finished int32
+	for _, p := range summaries {
+		if p.CurrentOrderIndex >= p.TotalScenes-1 {
+			finished++
+		}
+	}
+	return finished, nil
+}
+
+// CountUnlockedScenes returns how many paid scenes userID has ever
+// unlocked — used by the achievement module.
+func (s *Service) CountUnlockedScenes(ctx context.Context, userID uuid.UUID) (int32, error) {
+	unlocked, err := s.repo.ListUnlockedSceneIDs(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	return int32(len(unlocked)), nil
 }
 
 // GetOrCreateProgress returns the caller's progress on story, creating a

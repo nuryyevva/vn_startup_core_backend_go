@@ -37,3 +37,8 @@ RETURNING *;
 
 -- name: ListDialogMessages :many
 SELECT * FROM dialog_messages WHERE session_id = $1 ORDER BY created_at ASC;
+
+-- name: CountUserDialogMessagesBySender :one
+SELECT COUNT(*) FROM dialog_messages dm
+JOIN dialog_sessions ds ON ds.id = dm.session_id
+WHERE ds.user_id = $1 AND dm.sender = $2;

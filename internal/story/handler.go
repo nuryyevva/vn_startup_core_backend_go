@@ -22,20 +22,91 @@ func NewHandler(service *Service) *Handler {
 // user identity anyway.
 func (h *Handler) RegisterRoutes(router fiber.Router, auth fiber.Handler) {
 	router.Get("/stories", h.listStories)
+	router.Get("/stories/:id", h.getStory)
 	router.Get("/progress", auth, h.listMyProgress)
 	router.Get("/stories/:id/progress", auth, h.getProgress)
 	router.Get("/stories/:id/scenes", auth, h.listStoryScenes)
 	router.Get("/scenes/:id", auth, h.getScene)
 	router.Post("/scenes/:id/choice", auth, h.submitChoice)
 	router.Post("/scenes/:id/unlock", auth, h.unlockScene)
+	router.Get("/bookmarks", auth, h.listBookmarks)
+	router.Post("/stories/:id/bookmark", auth, h.addBookmark)
+	router.Delete("/stories/:id/bookmark", auth, h.removeBookmark)
 }
 
 func (h *Handler) listStories(c *fiber.Ctx) error {
-	stories, err := h.service.ListPublishedStories(c.Context())
+	var genre *string
+	if g := c.Query("genre"); g != "" {
+		genre = &g
+	}
+	page := int32(c.QueryInt("page", 1))
+	pageSize := int32(c.QueryInt("page_size", 0))
+
+	result, err := h.service.ListPublishedStories(c.Context(), genre, page, pageSize)
+	if err != nil {
+		return err
+	}
+	return c.JSON(toStoryListResponse(result))
+}
+
+func (h *Handler) getStory(c *fiber.Ctx) error {
+	storyID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return apperr.BadRequest("invalid_story_id", "Некорректный идентификатор истории")
+	}
+
+	story, err := h.service.GetPublishedStory(c.Context(), storyID)
+	if err != nil {
+		return err
+	}
+	return c.JSON(toStoryResponse(story))
+}
+
+func (h *Handler) listBookmarks(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	stories, err := h.service.ListBookmarks(c.Context(), userID)
 	if err != nil {
 		return err
 	}
 	return c.JSON(toStoryResponses(stories))
+}
+
+func (h *Handler) addBookmark(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	storyID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return apperr.BadRequest("invalid_story_id", "Некорректный идентификатор истории")
+	}
+
+	if err := h.service.Bookmark(c.Context(), userID, storyID); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *Handler) removeBookmark(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	storyID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return apperr.BadRequest("invalid_story_id", "Некорректный идентификатор истории")
+	}
+
+	if err := h.service.Unbookmark(c.Context(), userID, storyID); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 func (h *Handler) listMyProgress(c *fiber.Ctx) error {

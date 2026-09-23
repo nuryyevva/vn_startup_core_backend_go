@@ -32,6 +32,11 @@ func (m *mockRepository) GetUserByID(ctx context.Context, id uuid.UUID) (User, e
 	return args.Get(0).(User), args.Error(1)
 }
 
+func (m *mockRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	args := m.Called(ctx, id, passwordHash)
+	return args.Error(0)
+}
+
 func newTestIssuer() *TokenIssuer {
 	return NewTokenIssuer("test-secret-value-1234567890", 15*time.Minute, 720*time.Hour)
 }
@@ -166,4 +171,60 @@ func TestService_Refresh_RejectsAccessToken(t *testing.T) {
 	var appErr *apperr.Error
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, "invalid_refresh_token", appErr.Code)
+}
+
+func TestService_ChangePassword_Success(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, newTestIssuer())
+
+	userID := uuid.New()
+	hash, err := HashPassword("old-password")
+	require.NoError(t, err)
+	user := User{ID: userID, PasswordHash: hash}
+
+	repo.On("GetUserByID", mock.Anything, userID).Return(user, nil)
+	repo.On("UpdatePasswordHash", mock.Anything, userID, mock.AnythingOfType("string")).Return(nil)
+
+	err = svc.ChangePassword(context.Background(), userID, "old-password", "new-password")
+
+	require.NoError(t, err)
+	repo.AssertExpectations(t)
+}
+
+func TestService_ChangePassword_WrongCurrentPassword(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, newTestIssuer())
+
+	userID := uuid.New()
+	hash, err := HashPassword("old-password")
+	require.NoError(t, err)
+	user := User{ID: userID, PasswordHash: hash}
+
+	repo.On("GetUserByID", mock.Anything, userID).Return(user, nil)
+
+	err = svc.ChangePassword(context.Background(), userID, "wrong-password", "new-password")
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "invalid_credentials", appErr.Code)
+	repo.AssertNotCalled(t, "UpdatePasswordHash", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestService_ChangePassword_WeakNewPassword(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, newTestIssuer())
+
+	userID := uuid.New()
+	hash, err := HashPassword("old-password")
+	require.NoError(t, err)
+	user := User{ID: userID, PasswordHash: hash}
+
+	repo.On("GetUserByID", mock.Anything, userID).Return(user, nil)
+
+	err = svc.ChangePassword(context.Background(), userID, "old-password", "short")
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "weak_password", appErr.Code)
+	repo.AssertNotCalled(t, "UpdatePasswordHash", mock.Anything, mock.Anything, mock.Anything)
 }

@@ -30,6 +30,11 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 // TokenPair is returned from register/login/refresh.
 type TokenPair struct {
 	AccessToken  string `json:"access_token"`

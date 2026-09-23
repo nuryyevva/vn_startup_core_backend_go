@@ -22,6 +22,12 @@ func (s *Service) Balance(ctx context.Context, userID uuid.UUID) (int64, error) 
 	return s.repo.GetBalance(ctx, userID)
 }
 
+// TotalSpent returns the sum of all diamonds ever debited from userID, as a
+// positive number.
+func (s *Service) TotalSpent(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return s.repo.GetTotalSpent(ctx, userID)
+}
+
 // Grant credits amount diamonds to userID. It is only ever called from the
 // dev-only /dev/wallet/grant endpoint, gated by Config.Dev.EnableDevEndpoints.
 func (s *Service) Grant(ctx context.Context, userID uuid.UUID, amount int32) (Transaction, error) {

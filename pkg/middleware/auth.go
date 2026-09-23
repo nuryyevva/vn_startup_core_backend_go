@@ -11,9 +11,11 @@ import (
 	"vn_startup_core_backend_go/pkg/apperr"
 )
 
+// LocalsUserID and LocalsRole re-export auth.ContextUserIDKey/ContextRoleKey
+// under this package's own name for callers that only import pkg/middleware.
 const (
-	LocalsUserID = "user_id"
-	LocalsRole   = "role"
+	LocalsUserID = auth.ContextUserIDKey
+	LocalsRole   = auth.ContextRoleKey
 )
 
 // Auth returns a Fiber middleware that requires a valid access-token JWT,

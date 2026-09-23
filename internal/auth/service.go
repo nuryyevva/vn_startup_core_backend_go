@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/mail"
 
+	"github.com/google/uuid"
+
 	"vn_startup_core_backend_go/pkg/apperr"
 )
 
@@ -85,6 +87,36 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 	}
 
 	return s.issueTokens(user)
+}
+
+// ChangePassword verifies currentPassword against userID's stored hash and,
+// if it matches, replaces it with a hash of newPassword. Existing tokens
+// issued before the change remain valid until they expire — there is no
+// server-side token revocation in this service (see Refresh).
+func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return apperr.Unauthorized("invalid_credentials", "Неверный текущий пароль")
+		}
+		return err
+	}
+
+	ok, err := VerifyPassword(currentPassword, user.PasswordHash)
+	if err != nil || !ok {
+		return apperr.Unauthorized("invalid_credentials", "Неверный текущий пароль")
+	}
+
+	if len(newPassword) < minPasswordLength {
+		return apperr.BadRequest("weak_password", "Пароль должен содержать не менее 8 символов")
+	}
+
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.UpdatePasswordHash(ctx, userID, hash)
 }
 
 func (s *Service) issueTokens(user User) (TokenPair, error) {

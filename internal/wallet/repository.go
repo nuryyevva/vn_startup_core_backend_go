@@ -20,4 +20,8 @@ type Repository interface {
 	// user's balance covers it, serialized per-user so concurrent debits
 	// can never push the balance negative.
 	Debit(ctx context.Context, userID uuid.UUID, amount int32, reason string) (Transaction, error)
+	// GetTotalSpent returns the sum of all debits ever charged to userID, as
+	// a positive number — used by the achievement module's "big spender"
+	// style checks.
+	GetTotalSpent(ctx context.Context, userID uuid.UUID) (int64, error)
 }

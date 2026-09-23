@@ -9,6 +9,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// Fiber locals keys set by pkg/middleware.Auth once a request's JWT is
+// verified. Defined here (not in pkg/middleware) because pkg/middleware
+// already imports this package for TokenIssuer/ErrExpiredToken — importing
+// pkg/middleware back from here for these two string constants would create
+// an import cycle.
+const (
+	ContextUserIDKey = "user_id"
+	ContextRoleKey   = "role"
+)
+
 // TokenType distinguishes access tokens from refresh tokens so a refresh
 // token can never be used to authenticate an API request and vice versa.
 type TokenType string

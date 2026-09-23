@@ -14,3 +14,8 @@ WHERE user_id = $1;
 INSERT INTO wallet_transactions (user_id, amount, reason)
 VALUES ($1, $2, $3)
 RETURNING *;
+
+-- name: GetTotalDiamondsSpent :one
+SELECT COALESCE(-SUM(amount), 0)::bigint AS total_spent
+FROM wallet_transactions
+WHERE user_id = $1 AND amount < 0;

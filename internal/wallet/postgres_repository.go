@@ -35,6 +35,14 @@ func (r *PostgresRepository) Debit(ctx context.Context, userID uuid.UUID, amount
 	return r.createTransaction(ctx, userID, -amount, reason, true)
 }
 
+func (r *PostgresRepository) GetTotalSpent(ctx context.Context, userID uuid.UUID) (int64, error) {
+	total, err := r.queries.GetTotalDiamondsSpent(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("get total diamonds spent: %w", err)
+	}
+	return total, nil
+}
+
 // createTransaction locks the user's wallet for the duration of the
 // transaction (see LockWallet's doc comment for why an advisory lock is
 // used instead of SELECT ... FOR UPDATE), optionally verifies the

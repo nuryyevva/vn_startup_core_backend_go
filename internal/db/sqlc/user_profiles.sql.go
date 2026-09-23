@@ -16,7 +16,7 @@ import (
 const createUserProfile = `-- name: CreateUserProfile :one
 INSERT INTO user_profiles (user_id)
 VALUES ($1)
-RETURNING user_id, display_name, gender, favorite_genres, theme, language, updated_at
+RETURNING user_id, display_name, gender, favorite_genres, theme, language, updated_at, notify_new_chapters, notify_promotional_offers
 `
 
 func (q *Queries) CreateUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error) {
@@ -30,12 +30,14 @@ func (q *Queries) CreateUserProfile(ctx context.Context, userID uuid.UUID) (User
 		&i.Theme,
 		&i.Language,
 		&i.UpdatedAt,
+		&i.NotifyNewChapters,
+		&i.NotifyPromotionalOffers,
 	)
 	return i, err
 }
 
 const getUserProfile = `-- name: GetUserProfile :one
-SELECT user_id, display_name, gender, favorite_genres, theme, language, updated_at FROM user_profiles WHERE user_id = $1
+SELECT user_id, display_name, gender, favorite_genres, theme, language, updated_at, notify_new_chapters, notify_promotional_offers FROM user_profiles WHERE user_id = $1
 `
 
 func (q *Queries) GetUserProfile(ctx context.Context, userID uuid.UUID) (UserProfile, error) {
@@ -49,28 +51,33 @@ func (q *Queries) GetUserProfile(ctx context.Context, userID uuid.UUID) (UserPro
 		&i.Theme,
 		&i.Language,
 		&i.UpdatedAt,
+		&i.NotifyNewChapters,
+		&i.NotifyPromotionalOffers,
 	)
 	return i, err
 }
 
 const getUserWithProfile = `-- name: GetUserWithProfile :one
-SELECT u.id, u.email, u.role, u.created_at, p.display_name, p.gender, p.favorite_genres, p.theme, p.language, p.updated_at
+SELECT u.id, u.email, u.role, u.created_at, p.display_name, p.gender, p.favorite_genres, p.theme, p.language,
+       p.notify_new_chapters, p.notify_promotional_offers, p.updated_at
 FROM users u
 JOIN user_profiles p ON p.user_id = u.id
 WHERE u.id = $1
 `
 
 type GetUserWithProfileRow struct {
-	ID             uuid.UUID   `json:"id"`
-	Email          string      `json:"email"`
-	Role           string      `json:"role"`
-	CreatedAt      time.Time   `json:"created_at"`
-	DisplayName    pgtype.Text `json:"display_name"`
-	Gender         pgtype.Text `json:"gender"`
-	FavoriteGenres []string    `json:"favorite_genres"`
-	Theme          string      `json:"theme"`
-	Language       string      `json:"language"`
-	UpdatedAt      time.Time   `json:"updated_at"`
+	ID                      uuid.UUID   `json:"id"`
+	Email                   string      `json:"email"`
+	Role                    string      `json:"role"`
+	CreatedAt               time.Time   `json:"created_at"`
+	DisplayName             pgtype.Text `json:"display_name"`
+	Gender                  pgtype.Text `json:"gender"`
+	FavoriteGenres          []string    `json:"favorite_genres"`
+	Theme                   string      `json:"theme"`
+	Language                string      `json:"language"`
+	NotifyNewChapters       bool        `json:"notify_new_chapters"`
+	NotifyPromotionalOffers bool        `json:"notify_promotional_offers"`
+	UpdatedAt               time.Time   `json:"updated_at"`
 }
 
 func (q *Queries) GetUserWithProfile(ctx context.Context, id uuid.UUID) (GetUserWithProfileRow, error) {
@@ -86,6 +93,8 @@ func (q *Queries) GetUserWithProfile(ctx context.Context, id uuid.UUID) (GetUser
 		&i.FavoriteGenres,
 		&i.Theme,
 		&i.Language,
+		&i.NotifyNewChapters,
+		&i.NotifyPromotionalOffers,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -99,18 +108,22 @@ SET
     favorite_genres = COALESCE($3, favorite_genres),
     theme = COALESCE($4, theme),
     language = COALESCE($5, language),
+    notify_new_chapters = COALESCE($6, notify_new_chapters),
+    notify_promotional_offers = COALESCE($7, notify_promotional_offers),
     updated_at = now()
-WHERE user_id = $6
-RETURNING user_id, display_name, gender, favorite_genres, theme, language, updated_at
+WHERE user_id = $8
+RETURNING user_id, display_name, gender, favorite_genres, theme, language, updated_at, notify_new_chapters, notify_promotional_offers
 `
 
 type UpdateUserProfileParams struct {
-	DisplayName    pgtype.Text `json:"display_name"`
-	Gender         pgtype.Text `json:"gender"`
-	FavoriteGenres []string    `json:"favorite_genres"`
-	Theme          pgtype.Text `json:"theme"`
-	Language       pgtype.Text `json:"language"`
-	UserID         uuid.UUID   `json:"user_id"`
+	DisplayName             pgtype.Text `json:"display_name"`
+	Gender                  pgtype.Text `json:"gender"`
+	FavoriteGenres          []string    `json:"favorite_genres"`
+	Theme                   pgtype.Text `json:"theme"`
+	Language                pgtype.Text `json:"language"`
+	NotifyNewChapters       pgtype.Bool `json:"notify_new_chapters"`
+	NotifyPromotionalOffers pgtype.Bool `json:"notify_promotional_offers"`
+	UserID                  uuid.UUID   `json:"user_id"`
 }
 
 func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UserProfile, error) {
@@ -120,6 +133,8 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		arg.FavoriteGenres,
 		arg.Theme,
 		arg.Language,
+		arg.NotifyNewChapters,
+		arg.NotifyPromotionalOffers,
 		arg.UserID,
 	)
 	var i UserProfile
@@ -131,6 +146,8 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Theme,
 		&i.Language,
 		&i.UpdatedAt,
+		&i.NotifyNewChapters,
+		&i.NotifyPromotionalOffers,
 	)
 	return i, err
 }

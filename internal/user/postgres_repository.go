@@ -34,12 +34,14 @@ func (r *PostgresRepository) GetProfile(ctx context.Context, userID uuid.UUID) (
 
 func (r *PostgresRepository) UpdateProfile(ctx context.Context, userID uuid.UUID, input UpdateProfileInput) (Profile, error) {
 	params := sqlc.UpdateUserProfileParams{
-		UserID:         userID,
-		DisplayName:    textFromPtr(input.DisplayName),
-		Gender:         textFromPtr(input.Gender),
-		Theme:          textFromPtr(input.Theme),
-		Language:       textFromPtr(input.Language),
-		FavoriteGenres: input.FavoriteGenres,
+		UserID:                  userID,
+		DisplayName:             textFromPtr(input.DisplayName),
+		Gender:                  textFromPtr(input.Gender),
+		Theme:                   textFromPtr(input.Theme),
+		Language:                textFromPtr(input.Language),
+		FavoriteGenres:          input.FavoriteGenres,
+		NotifyNewChapters:       boolFromPtr(input.NotifyNewChapters),
+		NotifyPromotionalOffers: boolFromPtr(input.NotifyPromotionalOffers),
 	}
 
 	updated, err := r.queries.UpdateUserProfile(ctx, params)
@@ -63,6 +65,13 @@ func textFromPtr(s *string) pgtype.Text {
 	return pgtype.Text{String: *s, Valid: true}
 }
 
+func boolFromPtr(b *bool) pgtype.Bool {
+	if b == nil {
+		return pgtype.Bool{}
+	}
+	return pgtype.Bool{Bool: *b, Valid: true}
+}
+
 func ptrFromText(t pgtype.Text) *string {
 	if !t.Valid {
 		return nil
@@ -72,15 +81,17 @@ func ptrFromText(t pgtype.Text) *string {
 
 func toDomainProfile(row sqlc.GetUserWithProfileRow) Profile {
 	return Profile{
-		UserID:         row.ID,
-		Email:          row.Email,
-		Role:           row.Role,
-		CreatedAt:      row.CreatedAt,
-		DisplayName:    ptrFromText(row.DisplayName),
-		Gender:         ptrFromText(row.Gender),
-		FavoriteGenres: row.FavoriteGenres,
-		Theme:          row.Theme,
-		Language:       row.Language,
-		UpdatedAt:      row.UpdatedAt,
+		UserID:                  row.ID,
+		Email:                   row.Email,
+		Role:                    row.Role,
+		CreatedAt:               row.CreatedAt,
+		DisplayName:             ptrFromText(row.DisplayName),
+		Gender:                  ptrFromText(row.Gender),
+		FavoriteGenres:          row.FavoriteGenres,
+		Theme:                   row.Theme,
+		Language:                row.Language,
+		NotifyNewChapters:       row.NotifyNewChapters,
+		NotifyPromotionalOffers: row.NotifyPromotionalOffers,
+		UpdatedAt:               row.UpdatedAt,
 	}
 }

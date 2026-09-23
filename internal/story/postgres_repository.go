@@ -22,10 +22,51 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{queries: sqlc.New(pool)}
 }
 
-func (r *PostgresRepository) ListPublishedStories(ctx context.Context) ([]Story, error) {
-	rows, err := r.queries.ListPublishedStories(ctx)
+func (r *PostgresRepository) ListPublishedStories(ctx context.Context, filter ListStoriesFilter) ([]Story, int64, error) {
+	genre := pgtype.Text{}
+	if filter.Genre != nil {
+		genre = pgtype.Text{String: *filter.Genre, Valid: true}
+	}
+
+	rows, err := r.queries.ListPublishedStoriesPage(ctx, sqlc.ListPublishedStoriesPageParams{
+		Genre:       genre,
+		LimitCount:  filter.Limit,
+		OffsetCount: filter.Offset,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("list published stories: %w", err)
+		return nil, 0, fmt.Errorf("list published stories page: %w", err)
+	}
+
+	total, err := r.queries.CountPublishedStories(ctx, genre)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count published stories: %w", err)
+	}
+
+	out := make([]Story, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDomainStory(row))
+	}
+	return out, total, nil
+}
+
+func (r *PostgresRepository) AddBookmark(ctx context.Context, userID, storyID uuid.UUID) error {
+	if err := r.queries.AddStoryBookmark(ctx, sqlc.AddStoryBookmarkParams{UserID: userID, StoryID: storyID}); err != nil {
+		return fmt.Errorf("add story bookmark: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresRepository) RemoveBookmark(ctx context.Context, userID, storyID uuid.UUID) error {
+	if err := r.queries.RemoveStoryBookmark(ctx, sqlc.RemoveStoryBookmarkParams{UserID: userID, StoryID: storyID}); err != nil {
+		return fmt.Errorf("remove story bookmark: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresRepository) ListBookmarkedStories(ctx context.Context, userID uuid.UUID) ([]Story, error) {
+	rows, err := r.queries.ListBookmarkedStories(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list bookmarked stories: %w", err)
 	}
 	out := make([]Story, 0, len(rows))
 	for _, row := range rows {

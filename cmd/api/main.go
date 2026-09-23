@@ -17,10 +17,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"vn_startup_core_backend_go/internal/achievement"
 	"vn_startup_core_backend_go/internal/auth"
 	"vn_startup_core_backend_go/internal/config"
 	"vn_startup_core_backend_go/internal/dialog"
 	"vn_startup_core_backend_go/internal/realtime"
+	"vn_startup_core_backend_go/internal/stats"
 	"vn_startup_core_backend_go/internal/story"
 	"vn_startup_core_backend_go/internal/user"
 	"vn_startup_core_backend_go/internal/wallet"
@@ -74,6 +76,8 @@ func run() error {
 	storyRepo := story.NewPostgresRepository(pool)
 	walletRepo := wallet.NewPostgresRepository(pool)
 	dialogRepo := dialog.NewPostgresRepository(pool)
+	statsRepo := stats.NewPostgresRepository(pool)
+	achievementRepo := achievement.NewPostgresRepository(pool)
 
 	// --- services (wired in dependency order) ---
 	authService := auth.NewService(authRepo, tokenIssuer)
@@ -89,6 +93,13 @@ func run() error {
 		int32(cfg.Dialog.DefaultMessageCost),
 		log,
 	)
+	statsService := stats.NewService(statsRepo)
+	achievementService := achievement.NewService(achievementRepo, activityAdapter{
+		story:  storyService,
+		wallet: walletService,
+		dialog: dialogService,
+		stats:  statsService,
+	})
 
 	// --- handlers ---
 	authHandler := auth.NewHandler(authService)
@@ -97,6 +108,8 @@ func run() error {
 	walletHandler := wallet.NewHandler(walletService)
 	dialogHandler := dialog.NewHandler(dialogService)
 	realtimeHandler := realtime.NewHandler(hub, log)
+	statsHandler := stats.NewHandler(statsService)
+	achievementHandler := achievement.NewHandler(achievementService)
 
 	app := httpserver.New(log, cfg.CORS.AllowedOrigins)
 
@@ -108,10 +121,13 @@ func run() error {
 	// Fiber treats as a catch-all "Use" matching every path — including
 	// undefined ones, turning what should be 404s into 401s).
 	authMiddleware := middleware.Auth(tokenIssuer)
+	authHandler.RegisterProtectedRoutes(app, authMiddleware)
 	userHandler.RegisterRoutes(app, authMiddleware)
 	storyHandler.RegisterRoutes(app, authMiddleware)
 	walletHandler.RegisterRoutes(app, authMiddleware)
 	dialogHandler.RegisterRoutes(app, authMiddleware)
+	statsHandler.RegisterRoutes(app, authMiddleware)
+	achievementHandler.RegisterRoutes(app, authMiddleware)
 
 	if cfg.Dev.EnableDevEndpoints {
 		devWalletHandler := wallet.NewDevHandler(walletService)
@@ -189,5 +205,46 @@ func (a storySceneAdapter) GetSceneInfo(ctx context.Context, sceneID uuid.UUID) 
 		FreeDialogEnabled: scene.FreeDialogEnabled,
 		DialogLimitType:   scene.DialogLimitType,
 		DialogLimitValue:  scene.DialogLimitValue,
+	}, nil
+}
+
+// activityAdapter satisfies achievement.ActivityProvider by reading from the
+// story, wallet, dialog, and stats services, so the achievement module never
+// needs to import any of them directly.
+type activityAdapter struct {
+	story  *story.Service
+	wallet *wallet.Service
+	dialog *dialog.Service
+	stats  *stats.Service
+}
+
+func (a activityAdapter) GetActivityStats(ctx context.Context, userID uuid.UUID) (achievement.ActivityStats, error) {
+	finishedStories, err := a.story.CountFinishedStories(ctx, userID)
+	if err != nil {
+		return achievement.ActivityStats{}, err
+	}
+	unlockedScenes, err := a.story.CountUnlockedScenes(ctx, userID)
+	if err != nil {
+		return achievement.ActivityStats{}, err
+	}
+	messagesSent, err := a.dialog.CountUserMessagesSent(ctx, userID)
+	if err != nil {
+		return achievement.ActivityStats{}, err
+	}
+	diamondsSpent, err := a.wallet.TotalSpent(ctx, userID)
+	if err != nil {
+		return achievement.ActivityStats{}, err
+	}
+	userStats, err := a.stats.GetStats(ctx, userID)
+	if err != nil {
+		return achievement.ActivityStats{}, err
+	}
+
+	return achievement.ActivityStats{
+		FinishedStories:    finishedStories,
+		UnlockedScenes:     unlockedScenes,
+		DialogMessagesSent: messagesSent,
+		DiamondsSpent:      diamondsSpent,
+		DayStreak:          userStats.DayStreak,
 	}, nil
 }
