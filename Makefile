@@ -6,7 +6,7 @@ DB_DSN ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(or $(POSTGRES_HOST)
 include .env
 export
 
-.PHONY: up down run run-mockai seed build sqlc-generate migrate migrate-down migrate-force test test-unit test-integration lint tidy
+.PHONY: up down run run-mockai seed export-content build sqlc-generate migrate migrate-down migrate-force test test-unit test-integration lint tidy
 
 up:
 	docker-compose up -d
@@ -40,6 +40,13 @@ run-mockai:
 # admin panel at this stage. Safe to run more than once (idempotent).
 seed:
 	go run ./cmd/seed
+
+# export-content writes the same stories as a self-contained bundle
+# (content.json + media) into the Flutter app's assets, for its offline
+# build — no database involved. Hotlinked media is downloaded once.
+OFFLINE_CONTENT_DIR ?= ../vn_startup_frontend_flutter/assets/content
+export-content:
+	go run ./cmd/seed -export $(OFFLINE_CONTENT_DIR)
 
 sqlc-generate:
 	sqlc generate

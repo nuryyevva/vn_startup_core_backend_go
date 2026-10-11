@@ -20,6 +20,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -40,14 +41,32 @@ func main() {
 }
 
 func run() error {
+	exportDir := flag.String("export", "", "write the content bundle for the client's offline build to this directory instead of seeding the database")
+	flag.Parse()
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
 	log := logger.New(cfg.Server.Env)
-
 	ctx := context.Background()
+
+	stories, err := sampleStories()
+	if err != nil {
+		return fmt.Errorf("build sample stories: %w", err)
+	}
+
+	// -export writes the content as a bundle for the client's offline
+	// build instead of seeding the database (see export.go).
+	if *exportDir != "" {
+		if err := exportContent(ctx, stories, cfg.Media.Dir, *exportDir); err != nil {
+			return fmt.Errorf("export content: %w", err)
+		}
+		log.Info("seed: exported content", slog.String("dir", *exportDir), slog.Int("stories", len(stories)))
+		return nil
+	}
+
 	pool, err := pgxpool.New(ctx, cfg.Postgres.DSN())
 	if err != nil {
 		return fmt.Errorf("connect postgres: %w", err)
@@ -56,11 +75,6 @@ func run() error {
 
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping postgres: %w", err)
-	}
-
-	stories, err := sampleStories()
-	if err != nil {
-		return fmt.Errorf("build sample stories: %w", err)
 	}
 
 	for _, s := range stories {
