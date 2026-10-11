@@ -18,6 +18,7 @@ type Choice struct {
 	IsPaid       bool        `json:"is_paid"`
 	CostDiamonds int32       `json:"cost_diamonds"`
 	NextSceneID  pgtype.UUID `json:"next_scene_id"`
+	OnceKey      pgtype.Text `json:"once_key"`
 }
 
 type DialogMessage struct {
@@ -65,6 +66,8 @@ type Scene struct {
 	UnlockCostDiamonds pgtype.Int4 `json:"unlock_cost_diamonds"`
 	CharacterSpriteUrl pgtype.Text `json:"character_sprite_url"`
 	BackgroundMusicUrl pgtype.Text `json:"background_music_url"`
+	Title              pgtype.Text `json:"title"`
+	ChapterTitle       pgtype.Text `json:"chapter_title"`
 }
 
 type SceneUnlock struct {
@@ -82,6 +85,7 @@ type Story struct {
 	CreatedAt   time.Time   `json:"created_at"`
 	Genre       string      `json:"genre"`
 	Status      string      `json:"status"`
+	PlayerTheme []byte      `json:"player_theme"`
 }
 
 type StoryBookmark struct {

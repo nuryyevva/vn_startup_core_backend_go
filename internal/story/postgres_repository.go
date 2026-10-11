@@ -201,6 +201,34 @@ func (r *PostgresRepository) GetChoice(ctx context.Context, id uuid.UUID) (Choic
 	return toDomainChoice(row), nil
 }
 
+func (r *PostgresRepository) ListChoiceIDsFromEarlierScenes(ctx context.Context, scene Scene, choiceIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	ids, err := r.queries.ListChoiceIDsFromEarlierScenes(ctx, sqlc.ListChoiceIDsFromEarlierScenesParams{
+		StoryID:    scene.StoryID,
+		OrderIndex: scene.OrderIndex,
+		ChoiceIds:  choiceIDs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list choice ids from earlier scenes: %w", err)
+	}
+	out := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
+func (r *PostgresRepository) ListChoiceOnceKeys(ctx context.Context, storyID uuid.UUID, keys []string) (map[uuid.UUID]string, error) {
+	rows, err := r.queries.ListChoicesByOnceKeys(ctx, sqlc.ListChoicesByOnceKeysParams{StoryID: storyID, OnceKeys: keys})
+	if err != nil {
+		return nil, fmt.Errorf("list choices by once keys: %w", err)
+	}
+	out := make(map[uuid.UUID]string, len(rows))
+	for _, row := range rows {
+		out[row.ID] = row.OnceKey.String
+	}
+	return out, nil
+}
+
 func (r *PostgresRepository) GetProgress(ctx context.Context, userID, storyID uuid.UUID) (Progress, error) {
 	row, err := r.queries.GetPlayerProgress(ctx, sqlc.GetPlayerProgressParams{UserID: userID, StoryID: storyID})
 	if err != nil {
@@ -255,6 +283,7 @@ func toDomainStory(s sqlc.Story) Story {
 		Status:      s.Status,
 		IsPublished: s.IsPublished,
 		CreatedAt:   s.CreatedAt,
+		PlayerTheme: json.RawMessage(s.PlayerTheme),
 	}
 }
 
@@ -273,6 +302,8 @@ func toDomainScene(s sqlc.Scene) Scene {
 		UnlockCostDiamonds: ptrFromInt4(s.UnlockCostDiamonds),
 		CharacterSpriteURL: ptrFromText(s.CharacterSpriteUrl),
 		BackgroundMusicURL: ptrFromText(s.BackgroundMusicUrl),
+		ChapterTitle:       ptrFromText(s.ChapterTitle),
+		Title:              ptrFromText(s.Title),
 	}
 }
 
@@ -284,6 +315,7 @@ func toDomainChoice(c sqlc.Choice) Choice {
 		IsPaid:       c.IsPaid,
 		CostDiamonds: c.CostDiamonds,
 		NextSceneID:  ptrFromUUID(c.NextSceneID),
+		OnceKey:      ptrFromText(c.OnceKey),
 	}
 }
 

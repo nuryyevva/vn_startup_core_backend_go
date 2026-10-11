@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -116,6 +117,15 @@ func run() error {
 	app.Use("/auth/login", middleware.RateLimitByIP(redisClient, "auth_login", 20, time.Minute))
 	app.Use("/auth/register", middleware.RateLimitByIP(redisClient, "auth_register", 10, time.Minute))
 	authHandler.RegisterRoutes(app)
+
+	// Public, read-only story media (see config.MediaConfig). Registered
+	// after httpserver.New so CORS headers apply — Flutter web loads these
+	// via XHR and needs them. ByteRange lets media players stream and seek
+	// audio (iOS refuses to play a source that can't serve ranges at all).
+	app.Static("/media", cfg.Media.Dir, fiber.Static{
+		MaxAge:    int((24 * time.Hour).Seconds()),
+		ByteRange: true,
+	})
 
 	// Auth is applied per-route (not via an empty-prefix app.Group, which
 	// Fiber treats as a catch-all "Use" matching every path — including

@@ -14,11 +14,20 @@ up:
 down:
 	docker-compose down
 
+# On Windows the binary must be bin/api.exe: without the extension `go build`
+# writes an extensionless file next to a stale api.exe, and it's the stale
+# one that ends up being run.
+ifeq ($(OS),Windows_NT)
+API_BIN := bin/api.exe
+else
+API_BIN := bin/api
+endif
+
 build:
-	go build -o bin/api ./cmd/api
+	go build -o $(API_BIN) ./cmd/api
 
 run: build
-	./bin/api
+	./$(API_BIN)
 
 # run-mockai starts the throwaway AI Orchestrator stand-in (cmd/mockai) used
 # to exercise the WebSocket path end-to-end without the real Python service.
