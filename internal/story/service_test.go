@@ -42,6 +42,16 @@ func (m *mockRepository) GetStory(ctx context.Context, id uuid.UUID) (Story, err
 	return args.Get(0).(Story), args.Error(1)
 }
 
+func (m *mockRepository) ListChoiceIDsFromEarlierScenes(ctx context.Context, scene Scene, choiceIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	args := m.Called(ctx, scene, choiceIDs)
+	return args.Get(0).(map[uuid.UUID]bool), args.Error(1)
+}
+
+func (m *mockRepository) ListChoiceOnceKeys(ctx context.Context, storyID uuid.UUID, keys []string) (map[uuid.UUID]string, error) {
+	args := m.Called(ctx, storyID, keys)
+	return args.Get(0).(map[uuid.UUID]string), args.Error(1)
+}
+
 func (m *mockRepository) GetFirstScene(ctx context.Context, storyID uuid.UUID) (Scene, error) {
 	args := m.Called(ctx, storyID)
 	return args.Get(0).(Scene), args.Error(1)

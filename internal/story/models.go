@@ -16,6 +16,12 @@ type Story struct {
 	Status      string
 	IsPublished bool
 	CreatedAt   time.Time
+	// PlayerTheme styles the scene player (dialogue box, choice buttons)
+	// for this story: a JSON object naming a client-side preset and/or
+	// overriding individual design tokens. Nil means the app's default
+	// look. The backend stores and returns it verbatim — the token
+	// vocabulary belongs to the client (see README "Тема плеера").
+	PlayerTheme json.RawMessage
 }
 
 type Scene struct {
@@ -32,6 +38,12 @@ type Scene struct {
 	UnlockCostDiamonds *int32
 	CharacterSpriteURL *string
 	BackgroundMusicURL *string
+	// ChapterTitle is set only on the scene that starts a chapter, Title
+	// only on scenes that start a named section inside one. Branching
+	// stories are made of many short scenes, so the chapter list shows
+	// these instead of every scene (migrations 0015, 0016).
+	ChapterTitle *string
+	Title        *string
 }
 
 type Choice struct {
@@ -41,6 +53,9 @@ type Choice struct {
 	IsPaid       bool
 	CostDiamonds int32
 	NextSceneID  *uuid.UUID
+	// OnceKey, when set, makes the choice available only once per visit
+	// to its scene — see one_time_choices.go.
+	OnceKey *string
 }
 
 type Progress struct {
@@ -65,6 +80,9 @@ type StoryResponse struct {
 	Genre       string    `json:"genre"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
+	// omitempty drops a nil RawMessage, so unthemed stories don't carry
+	// a "player_theme": null.
+	PlayerTheme json.RawMessage `json:"player_theme,omitempty"`
 }
 
 func toStoryResponse(s Story) StoryResponse {
@@ -76,6 +94,7 @@ func toStoryResponse(s Story) StoryResponse {
 		Genre:       s.Genre,
 		Status:      s.Status,
 		CreatedAt:   s.CreatedAt,
+		PlayerTheme: s.PlayerTheme,
 	}
 }
 
@@ -134,6 +153,8 @@ type SceneResponse struct {
 	UnlockCostDiamonds *int32           `json:"unlock_cost_diamonds,omitempty"`
 	CharacterSpriteURL *string          `json:"character_sprite_url,omitempty"`
 	BackgroundMusicURL *string          `json:"background_music_url,omitempty"`
+	ChapterTitle       *string          `json:"chapter_title,omitempty"`
+	Title              *string          `json:"title,omitempty"`
 	Choices            []ChoiceResponse `json:"choices"`
 }
 
@@ -145,6 +166,8 @@ type SceneSummaryResponse struct {
 	OrderIndex         int32     `json:"order_index"`
 	UnlockCostDiamonds *int32    `json:"unlock_cost_diamonds,omitempty"`
 	IsUnlocked         bool      `json:"is_unlocked"`
+	ChapterTitle       *string   `json:"chapter_title,omitempty"`
+	Title              *string   `json:"title,omitempty"`
 }
 
 func toSceneSummaryResponse(s Scene, isUnlocked bool) SceneSummaryResponse {
@@ -153,6 +176,8 @@ func toSceneSummaryResponse(s Scene, isUnlocked bool) SceneSummaryResponse {
 		OrderIndex:         s.OrderIndex,
 		UnlockCostDiamonds: s.UnlockCostDiamonds,
 		IsUnlocked:         isUnlocked,
+		ChapterTitle:       s.ChapterTitle,
+		Title:              s.Title,
 	}
 }
 
@@ -193,6 +218,8 @@ func toSceneResponse(s Scene, choices []Choice) SceneResponse {
 		UnlockCostDiamonds: s.UnlockCostDiamonds,
 		CharacterSpriteURL: s.CharacterSpriteURL,
 		BackgroundMusicURL: s.BackgroundMusicURL,
+		ChapterTitle:       s.ChapterTitle,
+		Title:              s.Title,
 		Choices:            choiceResponses,
 	}
 }

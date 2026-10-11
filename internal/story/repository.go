@@ -31,6 +31,13 @@ type Repository interface {
 	ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error)
 	ListChoices(ctx context.Context, sceneID uuid.UUID) ([]Choice, error)
 	GetChoice(ctx context.Context, id uuid.UUID) (Choice, error)
+	// ListChoiceIDsFromEarlierScenes returns which of choiceIDs belong to
+	// scenes that come before scene in its story (a lower order_index),
+	// as a set.
+	ListChoiceIDsFromEarlierScenes(ctx context.Context, scene Scene, choiceIDs []uuid.UUID) (map[uuid.UUID]bool, error)
+	// ListChoiceOnceKeys returns, for every choice of the story whose
+	// once_key is one of keys, that key by choice ID.
+	ListChoiceOnceKeys(ctx context.Context, storyID uuid.UUID, keys []string) (map[uuid.UUID]string, error)
 	GetProgress(ctx context.Context, userID, storyID uuid.UUID) (Progress, error)
 	ListProgressByUser(ctx context.Context, userID uuid.UUID) ([]ProgressSummary, error)
 	CreateProgress(ctx context.Context, userID, storyID, sceneID uuid.UUID) (Progress, error)

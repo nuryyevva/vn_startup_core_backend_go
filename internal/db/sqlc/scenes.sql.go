@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createSceneUnlock = `-- name: CreateSceneUnlock :exec
@@ -27,7 +28,7 @@ func (q *Queries) CreateSceneUnlock(ctx context.Context, arg CreateSceneUnlockPa
 }
 
 const getChoice = `-- name: GetChoice :one
-SELECT id, scene_id, text, is_paid, cost_diamonds, next_scene_id FROM choices WHERE id = $1
+SELECT id, scene_id, text, is_paid, cost_diamonds, next_scene_id, once_key FROM choices WHERE id = $1
 `
 
 func (q *Queries) GetChoice(ctx context.Context, id uuid.UUID) (Choice, error) {
@@ -40,12 +41,13 @@ func (q *Queries) GetChoice(ctx context.Context, id uuid.UUID) (Choice, error) {
 		&i.IsPaid,
 		&i.CostDiamonds,
 		&i.NextSceneID,
+		&i.OnceKey,
 	)
 	return i, err
 }
 
 const getScene = `-- name: GetScene :one
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url FROM scenes WHERE id = $1
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title FROM scenes WHERE id = $1
 `
 
 func (q *Queries) GetScene(ctx context.Context, id uuid.UUID) (Scene, error) {
@@ -65,6 +67,8 @@ func (q *Queries) GetScene(ctx context.Context, id uuid.UUID) (Scene, error) {
 		&i.UnlockCostDiamonds,
 		&i.CharacterSpriteUrl,
 		&i.BackgroundMusicUrl,
+		&i.Title,
+		&i.ChapterTitle,
 	)
 	return i, err
 }
@@ -85,8 +89,81 @@ func (q *Queries) IsSceneUnlocked(ctx context.Context, arg IsSceneUnlockedParams
 	return exists, err
 }
 
+const listChoiceIDsFromEarlierScenes = `-- name: ListChoiceIDsFromEarlierScenes :many
+SELECT c.id FROM choices c
+JOIN scenes s ON s.id = c.scene_id
+WHERE s.story_id = $1
+  AND s.order_index < $2
+  AND c.id = ANY($3::uuid[])
+`
+
+type ListChoiceIDsFromEarlierScenesParams struct {
+	StoryID    uuid.UUID   `json:"story_id"`
+	OrderIndex int32       `json:"order_index"`
+	ChoiceIds  []uuid.UUID `json:"choice_ids"`
+}
+
+// Which of the given choices belong to scenes that come before order_index
+// in the story.
+func (q *Queries) ListChoiceIDsFromEarlierScenes(ctx context.Context, arg ListChoiceIDsFromEarlierScenesParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listChoiceIDsFromEarlierScenes, arg.StoryID, arg.OrderIndex, arg.ChoiceIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChoicesByOnceKeys = `-- name: ListChoicesByOnceKeys :many
+SELECT c.id, c.once_key FROM choices c
+JOIN scenes s ON s.id = c.scene_id
+WHERE s.story_id = $1
+  AND c.once_key = ANY($2::text[])
+`
+
+type ListChoicesByOnceKeysParams struct {
+	StoryID  uuid.UUID `json:"story_id"`
+	OnceKeys []string  `json:"once_keys"`
+}
+
+type ListChoicesByOnceKeysRow struct {
+	ID      uuid.UUID   `json:"id"`
+	OnceKey pgtype.Text `json:"once_key"`
+}
+
+func (q *Queries) ListChoicesByOnceKeys(ctx context.Context, arg ListChoicesByOnceKeysParams) ([]ListChoicesByOnceKeysRow, error) {
+	rows, err := q.db.Query(ctx, listChoicesByOnceKeys, arg.StoryID, arg.OnceKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListChoicesByOnceKeysRow{}
+	for rows.Next() {
+		var i ListChoicesByOnceKeysRow
+		if err := rows.Scan(&i.ID, &i.OnceKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChoicesByScene = `-- name: ListChoicesByScene :many
-SELECT id, scene_id, text, is_paid, cost_diamonds, next_scene_id FROM choices WHERE scene_id = $1 ORDER BY id ASC
+SELECT id, scene_id, text, is_paid, cost_diamonds, next_scene_id, once_key FROM choices WHERE scene_id = $1 ORDER BY id ASC
 `
 
 func (q *Queries) ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]Choice, error) {
@@ -105,6 +182,7 @@ func (q *Queries) ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]
 			&i.IsPaid,
 			&i.CostDiamonds,
 			&i.NextSceneID,
+			&i.OnceKey,
 		); err != nil {
 			return nil, err
 		}
@@ -117,7 +195,7 @@ func (q *Queries) ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]
 }
 
 const listScenesByStory = `-- name: ListScenesByStory :many
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url FROM scenes WHERE story_id = $1 ORDER BY order_index ASC
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title FROM scenes WHERE story_id = $1 ORDER BY order_index ASC
 `
 
 func (q *Queries) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error) {
@@ -143,6 +221,8 @@ func (q *Queries) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]S
 			&i.UnlockCostDiamonds,
 			&i.CharacterSpriteUrl,
 			&i.BackgroundMusicUrl,
+			&i.Title,
+			&i.ChapterTitle,
 		); err != nil {
 			return nil, err
 		}

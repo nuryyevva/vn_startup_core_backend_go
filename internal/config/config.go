@@ -23,6 +23,7 @@ type Config struct {
 	Dialog   DialogConfig
 	Dev      DevConfig
 	CORS     CORSConfig
+	Media    MediaConfig
 }
 
 // ServerConfig controls the HTTP server.
@@ -93,6 +94,17 @@ type DevConfig struct {
 // deployed frontend origin(s) in staging/production.
 type CORSConfig struct {
 	AllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"*"` // comma-separated, or "*"
+}
+
+// MediaConfig controls the static story media (backgrounds, sprites,
+// covers) served under /media. There's no object storage yet, so the API
+// serves these files itself from Dir; seeded scenes store root-relative
+// URLs ("/media/...") and clients resolve them against the API base URL,
+// which keeps the same DB rows valid for web, emulator and real devices.
+// Once object storage + CDN exists, point the URLs there instead and drop
+// this.
+type MediaConfig struct {
+	Dir string `env:"MEDIA_DIR" envDefault:"./media"`
 }
 
 // Load parses environment variables into a Config, applying defaults and

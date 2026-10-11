@@ -1,27 +1,31 @@
-// Command seed inserts a couple of sample stories — with scenes and
-// choices — into the database, adapted from public-domain fairy tales, so
-// every read/write endpoint in the API (GET /stories, GET
-// /stories/:id/progress, GET /scenes/:id, POST /scenes/:id/choice, and by
-// extension the wallet and dialog endpoints) can be exercised manually
-// without a content-authoring pipeline. There is no admin panel at this
+// Command seed inserts sample stories — with scenes and choices — into the
+// database: two short ones adapted from public-domain fairy tales, plus the
+// original branching story "Туман над Блэквудом" (see
+// fog_over_blackwood.go), so every read/write endpoint in the API (GET
+// /stories, GET /stories/:id/progress, GET /scenes/:id, POST
+// /scenes/:id/choice, and by extension the wallet and dialog endpoints) can
+// be exercised manually without a content-authoring pipeline. There is no admin panel at this
 // stage of the project, so this is the only way to get playable content
 // into a fresh database.
 //
 // It is idempotent (every row uses a fixed UUID and INSERT ... ON CONFLICT
 // DO UPDATE), so it's safe — and expected — to re-run after editing the
 // content below; existing rows are updated in place rather than skipped,
-// which is what makes it useful for iterating on art/audio URLs. It is not
+// which is what makes it useful for iterating on art/audio URLs, and rows
+// that disappeared from the content are pruned (see story.prune). It is not
 // part of golang-migrate's schema migrations — it seeds data, not schema,
 // and must never run against a production database.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"vn_startup_core_backend_go/internal/config"
@@ -54,7 +58,12 @@ func run() error {
 		return fmt.Errorf("ping postgres: %w", err)
 	}
 
-	for _, s := range sampleStories() {
+	stories, err := sampleStories()
+	if err != nil {
+		return fmt.Errorf("build sample stories: %w", err)
+	}
+
+	for _, s := range stories {
 		if err := s.insert(ctx, pool); err != nil {
 			return fmt.Errorf("seed story %q: %w", s.title, err)
 		}
@@ -76,6 +85,9 @@ type story struct {
 	coverURL    string
 	genre       string
 	status      string
+	// playerTheme is the stories.player_theme JSON object ("" = default
+	// look), e.g. `{"preset":"mist"}` — see README "Тема плеера".
+	playerTheme string
 	scenes      []scene
 	choices     []choice
 }
@@ -92,6 +104,8 @@ type scene struct {
 	dialogLimitType    *string // "time" | "messages" | nil
 	dialogLimitValue   *int32
 	unlockCostDiamonds *int32
+	chapterTitle       *string // non-nil only on the scene that starts a chapter
+	title              *string // non-nil only on scenes that start a section of a chapter
 }
 
 type choice struct {
@@ -101,6 +115,7 @@ type choice struct {
 	isPaid       bool
 	costDiamonds int32
 	nextSceneID  *uuid.UUID
+	onceKey      *string // see migration 0017_choices_once_key
 }
 
 func strPtr(s string) *string        { return &s }
@@ -118,29 +133,39 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 	// ON CONFLICT DO NOTHING — this command is meant to be re-run as sample
 	// content evolves (e.g. adding art/audio URLs), not only to be safe
 	// against re-running with unchanged data.
+	var playerTheme []byte // nil -> SQL NULL
+	if s.playerTheme != "" {
+		if !json.Valid([]byte(s.playerTheme)) {
+			return fmt.Errorf("player theme is not valid JSON: %s", s.playerTheme)
+		}
+		playerTheme = []byte(s.playerTheme)
+	}
+
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO stories (id, title, description, cover_url, genre, status, is_published)
-		 VALUES ($1, $2, $3, $4, $5, $6, true)
+		`INSERT INTO stories (id, title, description, cover_url, genre, status, player_theme, is_published)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, true)
 		 ON CONFLICT (id) DO UPDATE SET
 		     title = EXCLUDED.title, description = EXCLUDED.description, cover_url = EXCLUDED.cover_url,
-		     genre = EXCLUDED.genre, status = EXCLUDED.status`,
-		s.id, s.title, s.description, s.coverURL, s.genre, s.status,
+		     genre = EXCLUDED.genre, status = EXCLUDED.status, player_theme = EXCLUDED.player_theme`,
+		s.id, s.title, s.description, s.coverURL, s.genre, s.status, playerTheme,
 	); err != nil {
 		return fmt.Errorf("insert story: %w", err)
 	}
 
 	for _, sc := range s.scenes {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, character_sprite_url, background_music_url, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, character_sprite_url, background_music_url, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds, title, chapter_title)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			 ON CONFLICT (id) DO UPDATE SET
 			     order_index = EXCLUDED.order_index, background_url = EXCLUDED.background_url,
 			     character_id = EXCLUDED.character_id, character_sprite_url = EXCLUDED.character_sprite_url,
 			     background_music_url = EXCLUDED.background_music_url, dialogue_script = EXCLUDED.dialogue_script,
 			     free_dialog_enabled = EXCLUDED.free_dialog_enabled, dialog_limit_type = EXCLUDED.dialog_limit_type,
-			     dialog_limit_value = EXCLUDED.dialog_limit_value, unlock_cost_diamonds = EXCLUDED.unlock_cost_diamonds`,
+			     dialog_limit_value = EXCLUDED.dialog_limit_value, unlock_cost_diamonds = EXCLUDED.unlock_cost_diamonds,
+			     title = EXCLUDED.title, chapter_title = EXCLUDED.chapter_title`,
 			sc.id, s.id, sc.orderIndex, sc.backgroundURL, sc.characterID, sc.characterSpriteURL, sc.backgroundMusicURL,
 			[]byte(sc.dialogueScript), sc.freeDialogEnabled, sc.dialogLimitType, sc.dialogLimitValue, sc.unlockCostDiamonds,
+			sc.title, sc.chapterTitle,
 		); err != nil {
 			return fmt.Errorf("insert scene %s: %w", sc.id, err)
 		}
@@ -148,19 +173,70 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 
 	for _, c := range s.choices {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO choices (id, scene_id, text, is_paid, cost_diamonds, next_scene_id)
-			 VALUES ($1, $2, $3, $4, $5, $6)
+			`INSERT INTO choices (id, scene_id, text, is_paid, cost_diamonds, next_scene_id, once_key)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)
 			 ON CONFLICT (id) DO UPDATE SET
 			     text = EXCLUDED.text, is_paid = EXCLUDED.is_paid, cost_diamonds = EXCLUDED.cost_diamonds,
-			     next_scene_id = EXCLUDED.next_scene_id`,
-			c.id, c.sceneID, c.text, c.isPaid, c.costDiamonds, c.nextSceneID,
+			     next_scene_id = EXCLUDED.next_scene_id, once_key = EXCLUDED.once_key`,
+			c.id, c.sceneID, c.text, c.isPaid, c.costDiamonds, c.nextSceneID, c.onceKey,
 		); err != nil {
 			return fmt.Errorf("insert choice %s: %w", c.id, err)
 		}
 	}
 
+	if err := s.prune(ctx, tx); err != nil {
+		return err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
+	}
+	return nil
+}
+
+// prune removes this story's scenes and choices that are no longer part of
+// the seed content, so editing a story (renaming, reordering or dropping a
+// branch) doesn't leave stale choices showing up next to the current ones.
+// Players whose progress points at a removed scene are moved back to the
+// story's first scene — current_scene_id has no ON DELETE action, and
+// restarting is the only safe guess once their position no longer exists.
+func (s story) prune(ctx context.Context, tx pgx.Tx) error {
+	if len(s.scenes) == 0 {
+		return nil
+	}
+
+	sceneIDs := make([]string, 0, len(s.scenes))
+	first := s.scenes[0]
+	for _, sc := range s.scenes {
+		sceneIDs = append(sceneIDs, sc.id.String())
+		if sc.orderIndex < first.orderIndex {
+			first = sc
+		}
+	}
+	choiceIDs := make([]string, 0, len(s.choices))
+	for _, c := range s.choices {
+		choiceIDs = append(choiceIDs, c.id.String())
+	}
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM choices c USING scenes sc
+		 WHERE c.scene_id = sc.id AND sc.story_id = $1 AND c.id <> ALL($2::uuid[])`,
+		s.id, choiceIDs,
+	); err != nil {
+		return fmt.Errorf("prune choices: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE player_progress SET current_scene_id = $2
+		 WHERE story_id = $1 AND current_scene_id <> ALL($3::uuid[])`,
+		s.id, first.id, sceneIDs,
+	); err != nil {
+		return fmt.Errorf("reset progress on pruned scenes: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM scenes WHERE story_id = $1 AND id <> ALL($2::uuid[])`,
+		s.id, sceneIDs,
+	); err != nil {
+		return fmt.Errorf("prune scenes: %w", err)
 	}
 	return nil
 }
@@ -231,11 +307,15 @@ const (
 	aliceClockTickSfx         = "https://upload.wikimedia.org/wikipedia/commons/5/56/Clock_ticking.ogg"
 	// CC BY 3.0 — Laurens Goedhart, https://soundcloud.com/laurensgoedhart/claude-debussys-clair-de-lune
 	aliceBackgroundMusic = "https://upload.wikimedia.org/wikipedia/commons/b/be/Clair_de_lune_%28Claude_Debussy%29_Suite_bergamasque.ogg"
-	aliceCover           = "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Alice_par_John_Tenniel_02.png/500px-Alice_par_John_Tenniel_02.png"
+	aliceCover           = "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcSCRURJV79F1fADzxBT6MRq7RrfchiXfQeFIeLZ3OC81boJOWpb"
 )
 
-func sampleStories() []story {
-	return []story{redRidingHoodStory(), aliceStory()}
+func sampleStories() ([]story, error) {
+	blackwood, err := fogOverBlackwoodStory()
+	if err != nil {
+		return nil, fmt.Errorf("fog over blackwood: %w", err)
+	}
+	return []story{redRidingHoodStory(), aliceStory(), blackwood}, nil
 }
 
 func redRidingHoodStory() story {
@@ -246,6 +326,7 @@ func redRidingHoodStory() story {
 		coverURL:    ridingHoodCover,
 		genre:       "fantasy",
 		status:      "completed",
+		playerTheme: `{"preset":"storybook"}`,
 		scenes: []scene{
 			{
 				id:                 redRidingHoodScene1ID,
@@ -314,6 +395,9 @@ func aliceStory() story {
 		coverURL:    aliceCover,
 		genre:       "adventure",
 		status:      "ongoing",
+		// A preset plus one overridden token: gold accents on the
+		// wonderland palette.
+		playerTheme: `{"preset":"wonderland","accent_color":"#E8C36A"}`,
 		scenes: []scene{
 			{
 				id:                 aliceScene1ID,

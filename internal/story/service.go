@@ -224,7 +224,12 @@ func (s *Service) GetSceneForPlayer(ctx context.Context, userID, sceneID uuid.UU
 		return Scene{}, nil, err
 	}
 
-	return scene, choices, nil
+	used, err := s.usedOneTimeChoices(ctx, userID, scene, choices)
+	if err != nil {
+		return Scene{}, nil, err
+	}
+
+	return scene, withoutUsedChoices(choices, used), nil
 }
 
 // ListStoryScenes returns every scene of storyID with a per-user lock flag,
@@ -308,6 +313,22 @@ func (s *Service) SubmitChoice(ctx context.Context, userID, sceneID, choiceID uu
 	}
 	if choice.SceneID != scene.ID {
 		return Progress{}, apperr.BadRequest("choice_not_in_scene", "Этот вариант выбора не принадлежит указанной сцене")
+	}
+
+	// The client only ever shows what GetSceneForPlayer returned, but the
+	// rule is enforced here too — before any diamonds are charged.
+	if choice.OnceKey != nil {
+		siblings, err := s.repo.ListChoices(ctx, scene.ID)
+		if err != nil {
+			return Progress{}, err
+		}
+		used, err := s.usedOneTimeChoices(ctx, userID, scene, siblings)
+		if err != nil {
+			return Progress{}, err
+		}
+		if used[choice.ID] && len(withoutUsedChoices(siblings, used)) < len(siblings) {
+			return Progress{}, apperr.BadRequest("choice_already_made", "Этот вариант уже был выбран")
+		}
 	}
 
 	if choice.IsPaid && choice.CostDiamonds > 0 {

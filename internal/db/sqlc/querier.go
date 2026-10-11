@@ -40,6 +40,10 @@ type Querier interface {
 	IncrementDialogSessionMessageCount(ctx context.Context, id uuid.UUID) (DialogSession, error)
 	IsSceneUnlocked(ctx context.Context, arg IsSceneUnlockedParams) (bool, error)
 	ListBookmarkedStories(ctx context.Context, userID uuid.UUID) ([]Story, error)
+	// Which of the given choices belong to scenes that come before order_index
+	// in the story.
+	ListChoiceIDsFromEarlierScenes(ctx context.Context, arg ListChoiceIDsFromEarlierScenesParams) ([]uuid.UUID, error)
+	ListChoicesByOnceKeys(ctx context.Context, arg ListChoicesByOnceKeysParams) ([]ListChoicesByOnceKeysRow, error)
 	ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]Choice, error)
 	ListDialogMessages(ctx context.Context, sessionID uuid.UUID) ([]DialogMessage, error)
 	ListExpiredTimeLimitedSessions(ctx context.Context) ([]DialogSession, error)
