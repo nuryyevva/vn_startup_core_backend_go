@@ -145,6 +145,17 @@ type graphBeat struct {
 	title   *string
 	bg      string
 	lines   []scriptLine
+	talk    *talkTo
+}
+
+// talkTo turns a beat into one where the player can start a free dialog with
+// an AI-driven character (scenes.character_id + free_dialog_enabled). The
+// character's persona and memories live in the AI module's characters/
+// folder under the same ID.
+type talkTo struct {
+	characterID uuid.UUID
+	sprite      string // shown whenever no line has chosen a sprite yet
+	messages    int32  // free-dialog message limit
 }
 
 type graphLink struct {
@@ -167,6 +178,14 @@ func (g *storyGraph) beat(key, bg string, lines ...scriptLine) *graphBeat {
 	b := &graphBeat{key: key, bg: bg, lines: lines}
 	g.beats = append(g.beats, b)
 	g.byKey[key] = b
+	return b
+}
+
+// talksWith lets the player start a free dialog with the character in this
+// beat. Pick beats where the character is on screen and the player can
+// linger (hubs): the "talk" button sits next to the beat's choices.
+func (b *graphBeat) talksWith(characterID uuid.UUID, sprite string, messages int32) *graphBeat {
+	b.talk = &talkTo{characterID: characterID, sprite: sprite, messages: messages}
 	return b
 }
 
@@ -295,7 +314,7 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 		if track != "" {
 			music = strPtr(track)
 		}
-		scenes = append(scenes, scene{
+		sc := scene{
 			id:                 g.sceneID(b.key),
 			orderIndex:         i,
 			backgroundURL:      b.bg,
@@ -303,7 +322,17 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 			dialogueScript:     string(raw),
 			chapterTitle:       b.chapter,
 			title:              b.title,
-		})
+		}
+		if t := b.talk; t != nil {
+			sc.characterID = uuidPtr(t.characterID)
+			if t.sprite != "" {
+				sc.characterSpriteURL = strPtr(t.sprite)
+			}
+			sc.freeDialogEnabled = true
+			sc.dialogLimitType = strPtr("messages")
+			sc.dialogLimitValue = i32Ptr(t.messages)
+		}
+		scenes = append(scenes, sc)
 	}
 
 	choices := make([]choice, 0, len(g.links))
