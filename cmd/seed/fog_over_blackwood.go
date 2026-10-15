@@ -275,7 +275,7 @@ func sceneTwo(g *storyGraph) {
 		noah.say("Ной Картер. Кофе лишний."),
 		evelyn.say("Ты всегда покупаешь кофе незнакомым людям?"),
 		noah.say("Только тем, кто уже пострадал от нашего сэндвича."),
-	).titled("Люди за дальним столом")
+	).titled("Люди за дальним столом").talksWith(bwNoahID, noah.sprite, bwTalkMessages)
 
 	g.link(from("s2.cafeteria"), "Принять помощь", "s2.hall",
 		evelyn.say("Эвелин Морроу. И, кажется, ты только что спас мне завтрак."),
@@ -311,10 +311,7 @@ func sceneTwo(g *storyGraph) {
 		thought("Я тоже ничего не съела. Это ещё не делает людей загадочными.").show(evelyn),
 		narr("Но Эвелин замечает: когда у соседнего стола с грохотом падает поднос, все трое поворачиваются одновременно.").hide(),
 	)
-	g.explore(look, "Присмотреться к Люси", "s2.hall",
-		narr("Стоит Эвелин задержать на ней взгляд, Люси поднимает голову и улыбается.").show(lucy),
-		thought("Она заметила меня раньше, чем я решила на неё посмотреть. Или мне просто неловко, что я пялюсь."),
-	)
+	g.explore(look, "Присмотреться к Люси", "s2.lucy")
 	g.explore(look, "Присмотреться к Дэмиану", "s2.damian")
 	g.link(look, "Спросить Ноя о людях за дальним столом", "s2.vails")
 
@@ -328,6 +325,15 @@ func sceneTwo(g *storyGraph) {
 	g.link(from("s2.damian"), "Вернуться к Ною", "s2.hall",
 		evelyn.say("Не сегодня."),
 		damian.say("Как знаешь."),
+	)
+
+	// Like s2.damian: the player may talk to Lucy before the scheduled meeting.
+	g.beat("s2.lucy", bwCafeteria,
+		narr("Стоит Эвелин задержать на ней взгляд, Люси поднимает голову и улыбается.").show(lucy),
+		thought("Она заметила меня раньше, чем я решила на неё посмотреть. Или мне просто неловко, что я пялюсь."),
+	).talksWith(bwLucyID, lucy.sprite, bwTalkMessages)
+	g.link(from("s2.lucy"), "Вернуться к Ною", "s2.hall",
+		narr("Люси машет ей и возвращается к тетради.").show(lucy),
 	)
 
 	g.beat("s2.board", bwCafeteria,
@@ -345,7 +351,7 @@ func sceneTwo(g *storyGraph) {
 		noah.say("Вейлы."),
 		evelyn.say("По твоему тону я должна была всё понять."),
 		noah.say("Просто держись с ними осторожнее."),
-	)
+	).talksWith(bwNoahID, noah.sprite, bwTalkMessages)
 	g.link(from("s2.vails"), "Попросить факты", "s2.approach",
 		evelyn.say("Они кому-нибудь что-то сделали?"),
 		noah.say("Мне — нет."),
@@ -496,7 +502,7 @@ func sceneThree(g *storyGraph) (hasPhoto, noPhoto lineCondition) {
 	g.beat("s3.noah", bwParking,
 		evelyn.say("Ты видел, как он оказался рядом?"),
 		noah.say("Нет. Я услышал удар и выбежал."),
-	)
+	).talksWith(bwNoahID, noah.sprite, bwTalkMessages)
 	g.link(from("s3.noah"), "Настаивать", "s3.lot",
 		noah.say("Я верю, что ты что-то увидела. Но не буду говорить, что видел это тоже."),
 		thought("Неприятно. Но лучше, чем если бы он просто согласился.").show(evelyn),
@@ -631,7 +637,7 @@ func sceneFive(g *storyGraph) {
 		morgan.say("Она оставила его вам?"),
 		evelyn.say("Просила отдать лично."),
 		narr("Он протягивает руку.").show(morgan),
-	).titled("Чужая подпись")
+	).titled("Чужая подпись").talksWith(bwMorganID, morgan.sprite, bwTalkMessages)
 
 	keyGiven := g.link(from("s5.archive"), "Отдать ключ", "s5.room",
 		narr("Морган берёт ключ осторожно, проводит большим пальцем по синей нитке.").show(morgan),
@@ -682,7 +688,7 @@ func sceneFive(g *storyGraph) {
 		morgan.say("Её нашли дома."),
 		evelyn.say("Это разные вещи."),
 		narr("Он снимает очки.").show(morgan),
-	)
+	).talksWith(bwMorganID, morgan.sprite, bwTalkMessages)
 	g.link(from("s5.journal"), "Попросить по-человечески", "s5.goodbye",
 		evelynSad.say("Я даже не успела с ней попрощаться. Пожалуйста, не заставляйте меня выпрашивать каждое слово."),
 		narr("Морган долго смотрит на журнал.").show(morgan),
@@ -753,7 +759,7 @@ func sceneSix(g *storyGraph) {
 		adrian.say("Дорога размыта."),
 		evelyn.say("Это должно меня остановить?"),
 		adrian.say("Нет. Поэтому я здесь."),
-	).titled("Третья ступенька")
+	).titled("Третья ступенька").talksWith(bwAdrianID, adrian.sprite, bwTalkMessages)
 
 	g.link(from("s6.porch"), "Поехать вместе", "s6.road",
 		evelyn.say("Хорошо. Но по дороге ты расскажешь, что делал с ней у озера."),
@@ -785,7 +791,7 @@ func sceneSix(g *storyGraph) {
 		narr("Лес подступает к дороге вплотную. В низинах лежит туман. Иногда фары выхватывают старые указатели, надписи на которых почти стёрлись."),
 		narr("Адриан сбрасывает скорость перед поворотами ещё до того, как они появляются в свете фар.").show(adrian),
 		thought("Он хорошо знает дорогу. Хотя у озера якобы никогда не был.").show(evelyn),
-	)
+	).talksWith(bwAdrianID, adrian.sprite, bwTalkMessages)
 	arrival := []scriptLine{
 		narr("Дальше дорогу перекрывает упавшая сосна.").bg(bwForestRoad).hide(),
 		narr("За ней начинается тропа к одноэтажному дому на невысоком склоне. Между стволами поблёскивает вода."),
