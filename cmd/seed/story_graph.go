@@ -127,8 +127,13 @@ type storyGraph struct {
 	ns uuid.UUID
 	// music loops under every beat (scenes.background_music_url); the
 	// client keeps it playing across beats as long as the URL is the same.
-	music   string
-	beats   []*graphBeat
+	music string
+	// musicFor, when set, picks the track for a beat by its key and overrides
+	// music for beats it returns a non-empty URL for. Keep it stable within a
+	// stretch of the story: the client restarts the track whenever the URL
+	// changes between beats.
+	musicFor func(beatKey string) string
+	beats    []*graphBeat
 	byKey   map[string]*graphBeat
 	links   []*graphLink
 	nextPos map[string]int
@@ -280,9 +285,15 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("marshal script of beat %q: %w", b.key, err)
 		}
+		track := g.music
+		if g.musicFor != nil {
+			if url := g.musicFor(b.key); url != "" {
+				track = url
+			}
+		}
 		var music *string
-		if g.music != "" {
-			music = strPtr(g.music)
+		if track != "" {
+			music = strPtr(track)
 		}
 		scenes = append(scenes, scene{
 			id:                 g.sceneID(b.key),

@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"math/rand"
+	"strings"
+
 	"github.com/google/uuid"
 )
 
@@ -19,9 +23,15 @@ const blackwoodMedia = "/media/stories/fog-over-blackwood/"
 
 const (
 	bwCover = blackwoodMedia + "cover.webp"
-	// "Tender Moment" by John Bartmann, CC0 — see
-	// media/stories/fog-over-blackwood/CREDITS.md.
-	bwMusic = blackwoodMedia + "audio/tender_moment.mp3"
+
+	// Soundtrack. Sources and licences: media/stories/fog-over-blackwood/CREDITS.md.
+	bwTrackTender  = blackwoodMedia + "audio/tender_moment.mp3"
+	bwTrackComa    = blackwoodMedia + "audio/Marilyn_Manson_Coma_White_Acoustic_Cover.mp3"
+	bwTrackMystery = blackwoodMedia + "audio/kevin_macleod_comfortable_mystery.mp3"
+	bwTrackLights  = blackwoodMedia + "audio/alyosha_thousand_lights_minus.mp3"
+
+	// Default track, used by any beat musicFor has no pick for.
+	bwMusic = bwTrackComa
 
 	bwHouseExterior    = blackwoodMedia + "backgrounds/grandma_house_exterior.webp"
 	bwKitchen          = blackwoodMedia + "backgrounds/grandma_kitchen.webp"
@@ -54,9 +64,37 @@ var (
 
 func from(keys ...string) []string { return keys }
 
+// bwMusicSeed fixes the "random" soundtrack layout so re-running the seed
+// never reshuffles it. Change it to roll a different layout.
+const bwMusicSeed = 7
+
+// bwSectionMusic gives each of the story's eight sections (beat keys "s1.*" …
+// "s8.*") one of the tracks, picked at random but never the same track in two
+// neighbouring sections — a switch of track happens only at a section border,
+// since the client restarts the music whenever the URL changes.
+func bwSectionMusic() func(beatKey string) string {
+	tracks := []string{bwTrackTender, bwTrackComa, bwTrackMystery, bwTrackLights}
+	rng := rand.New(rand.NewSource(bwMusicSeed))
+	bySection := map[string]string{}
+	prev := ""
+	for i := 1; i <= 8; i++ {
+		track := tracks[rng.Intn(len(tracks))]
+		for track == prev {
+			track = tracks[rng.Intn(len(tracks))]
+		}
+		bySection[fmt.Sprintf("s%d", i)] = track
+		prev = track
+	}
+	return func(beatKey string) string {
+		section, _, _ := strings.Cut(beatKey, ".")
+		return bySection[section]
+	}
+}
+
 func fogOverBlackwoodStory() (story, error) {
 	g := newStoryGraph(fogOverBlackwoodStoryID)
 	g.music = bwMusic
+	g.musicFor = bwSectionMusic()
 
 	sceneOne(g)
 	sceneTwo(g)
