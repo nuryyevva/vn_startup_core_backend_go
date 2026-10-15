@@ -87,6 +87,39 @@ func TestFogOverBlackwood_GraphIsValid(t *testing.T) {
 	assert.NotNil(t, s.scenes[0].chapterTitle, "the chapter starts at the first scene")
 }
 
+func TestFogOverBlackwood_TalkBeats(t *testing.T) {
+	s, err := fogOverBlackwoodStory()
+	require.NoError(t, err)
+
+	talkers := map[uuid.UUID]int{}
+	for _, sc := range s.scenes {
+		if !sc.freeDialogEnabled {
+			assert.Nil(t, sc.characterID, "a character without free dialog would show a bare silhouette")
+			continue
+		}
+		require.NotNil(t, sc.characterID)
+		require.NotNil(t, sc.dialogLimitType)
+		require.NotNil(t, sc.dialogLimitValue)
+		assert.Equal(t, "messages", *sc.dialogLimitType)
+		assert.Positive(t, *sc.dialogLimitValue)
+		assert.NotNil(t, sc.characterSpriteURL, "talk beat needs a sprite so the client doesn't fall back to a silhouette")
+		talkers[*sc.characterID]++
+	}
+
+	// Every character the AI module has a card for is reachable; the lists of
+	// scenes live in vn_startup_ai/characters/<name>/card.yaml (talk_scenes).
+	for name, want := range map[string]struct {
+		id    uuid.UUID
+		beats int
+	}{
+		"Адриан": {bwAdrianID, 3}, "Дэмиан": {bwDamianID, 1}, "Люси": {bwLucyID, 2},
+		"Ной": {bwNoahID, 4}, "Морган": {bwMorganID, 3},
+	} {
+		assert.Equal(t, want.beats, talkers[want.id], "%s: number of talk beats", name)
+	}
+	assert.Len(t, talkers, 5)
+}
+
 func TestFogOverBlackwood_IDsAreStable(t *testing.T) {
 	a, err := fogOverBlackwoodStory()
 	require.NoError(t, err)
