@@ -19,6 +19,22 @@ import (
 
 var fogOverBlackwoodStoryID = uuid.MustParse("33333333-3333-3333-3333-333333333301")
 
+// Characters the player can talk to freely. These IDs are the link to the AI
+// module: its characters/<name>/card.yaml files carry the same `id`. Where each
+// of them can be talked to is set with .talksWith(...) on the beats below
+// (s2.hall Noah, s2.meet Lucy, s2.damian Damian, s4.watch Adrian, s5.room
+// Morgan); Evelyn is the player's own character and has no card.
+var (
+	bwAdrianID = uuid.MustParse("33333333-3333-3333-3333-3333333333a1")
+	bwDamianID = uuid.MustParse("33333333-3333-3333-3333-3333333333a2")
+	bwLucyID   = uuid.MustParse("33333333-3333-3333-3333-3333333333a3")
+	bwNoahID   = uuid.MustParse("33333333-3333-3333-3333-3333333333a4")
+	bwMorganID = uuid.MustParse("33333333-3333-3333-3333-3333333333a5")
+)
+
+// bwTalkMessages is the free-dialog message limit of every talk beat.
+const bwTalkMessages = 8
+
 const blackwoodMedia = "/media/stories/fog-over-blackwood/"
 
 const (
@@ -284,7 +300,7 @@ func sceneTwo(g *storyGraph) {
 	)
 
 	look := from("s2.hall")
-	g.beat("s2.hall", bwCafeteria)
+	g.beat("s2.hall", bwCafeteria).talksWith(bwNoahID, noah.sprite, bwTalkMessages)
 	g.explore(look, "Доска объявлений", "s2.board")
 	g.explore(look, "Дальний стол", "s2.hall",
 		narr("За дальним столом сидят трое: Люси, Адриан и Дэмиан Вейлы.").hide(),
@@ -299,7 +315,20 @@ func sceneTwo(g *storyGraph) {
 		narr("Стоит Эвелин задержать на ней взгляд, Люси поднимает голову и улыбается.").show(lucy),
 		thought("Она заметила меня раньше, чем я решила на неё посмотреть. Или мне просто неловко, что я пялюсь."),
 	)
+	g.explore(look, "Присмотреться к Дэмиану", "s2.damian")
 	g.link(look, "Спросить Ноя о людях за дальним столом", "s2.vails")
+
+	// An optional side beat so the player can talk to Damian, who otherwise only
+	// shows up for one line in s2.meet.
+	g.beat("s2.damian", bwCafeteria,
+		narr("Дэмиан замечает её взгляд раньше, чем она успевает отвернуться.").show(damian),
+		damian.say("Если хочешь что-то спросить — спрашивай. Я не кусаюсь. Пока не доказано обратное."),
+		narr("Кольцо на его пальце делает ещё один оборот."),
+	).talksWith(bwDamianID, damian.sprite, bwTalkMessages)
+	g.link(from("s2.damian"), "Вернуться к Ною", "s2.hall",
+		evelyn.say("Не сегодня."),
+		damian.say("Как знаешь."),
+	)
 
 	g.beat("s2.board", bwCafeteria,
 		narr("Среди объявлений о секциях и продаже учебников висит заметка об ограничении доступа к северной лесной дороге после дождей.").hide(),
@@ -368,7 +397,7 @@ func sceneTwo(g *storyGraph) {
 		narr("Адриан не отвечает.").show(adrian),
 		thought("Кажется, я случайно попала в чужую ссору.").show(evelyn),
 		narr("Вейлы уходят. Люси оборачивается и прощально поднимает руку.").show(lucy),
-	)
+	).talksWith(bwLucyID, lucy.sprite, bwTalkMessages)
 }
 
 // --- Сцена 3. Расстояние в пятьдесят метров ---
@@ -508,7 +537,7 @@ func sceneFour(g *storyGraph, hasPhoto, noPhoto lineCondition) {
 	).titled("Версия, в которую удобно поверить")
 
 	watch := from("s4.corridor", "s4.watch")
-	g.beat("s4.watch", bwCorridor)
+	g.beat("s4.watch", bwCorridor).talksWith(bwAdrianID, adrian.sprite, bwTalkMessages)
 	g.explore(watch, "Присмотреться к книге", "s4.watch",
 		narr("За то время, пока Эвелин идёт по коридору, он ни разу не переворачивает страницу.").show(adrian),
 		thought("Может, он тоже плохо спал. Почему мне вообще хочется найти что-то, что нас объединяет?"),
@@ -619,7 +648,7 @@ func sceneFive(g *storyGraph) {
 	)
 
 	explore := from("s5.room")
-	g.beat("s5.room", bwArchive)
+	g.beat("s5.room", bwArchive).talksWith(bwMorganID, morgan.sprite, bwTalkMessages)
 	g.explore(explore, "Карта окрестностей", "s5.room",
 		narr("На стене висит карта с пометками карандашом. Северный берег озера обведён.").hide(),
 		narr("К нему ведёт лесная дорога, заканчивающаяся возле маленького прямоугольника."),
