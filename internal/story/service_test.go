@@ -521,3 +521,81 @@ func TestToSceneResponse_PreservesDialogueScript(t *testing.T) {
 
 	assert.JSONEq(t, string(raw), string(resp.DialogueScript))
 }
+
+func TestService_RestartStory_ResetsProgressAndAnnouncesIt(t *testing.T) {
+	repo := new(mockRepository)
+	publisher := new(mockPublisher)
+	svc := NewService(repo, new(mockWallet), publisher, nil)
+
+	userID, storyID, firstSceneID, laterSceneID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	existing := Progress{UserID: userID, StoryID: storyID, CurrentSceneID: laterSceneID, ChoicesMade: []uuid.UUID{uuid.New()}}
+	restarted := Progress{UserID: userID, StoryID: storyID, CurrentSceneID: firstSceneID, ChoicesMade: []uuid.UUID{}}
+
+	repo.On("GetProgress", mock.Anything, userID, storyID).Return(existing, nil)
+	repo.On("GetFirstScene", mock.Anything, storyID).Return(Scene{ID: firstSceneID, StoryID: storyID}, nil)
+	repo.On("UpdateProgress", mock.Anything, userID, storyID, firstSceneID, []uuid.UUID{}).Return(restarted, nil)
+	publisher.On("Publish", mock.Anything, "player.story.restarted", PlayerStoryRestartedEvent{UserID: userID, StoryID: storyID}).Return(nil)
+
+	progress, err := svc.RestartStory(context.Background(), userID, storyID, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, restarted, progress)
+	publisher.AssertExpectations(t)
+}
+
+func TestService_RestartStory_UnknownStoryIsNotFound(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, storyID := uuid.New(), uuid.New()
+	repo.On("GetProgress", mock.Anything, userID, storyID).Return(Progress{}, ErrProgressNotFound)
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{}, ErrStoryNotFound)
+
+	_, err := svc.RestartStory(context.Background(), userID, storyID, nil)
+
+	require.Error(t, err)
+	repo.AssertNotCalled(t, "UpdateProgress", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestService_RestartStory_FromChapterKeepsEarlierChoicesAndAnnouncesTheOrder(t *testing.T) {
+	repo := new(mockRepository)
+	publisher := new(mockPublisher)
+	svc := NewService(repo, new(mockWallet), publisher, nil)
+
+	userID, storyID, chapterSceneID := uuid.New(), uuid.New(), uuid.New()
+	earlierChoice, laterChoice := uuid.New(), uuid.New()
+	existing := Progress{
+		UserID: userID, StoryID: storyID, CurrentSceneID: uuid.New(), ChoicesMade: []uuid.UUID{earlierChoice, laterChoice},
+	}
+	chapterScene := Scene{ID: chapterSceneID, StoryID: storyID, OrderIndex: 7}
+	restarted := Progress{UserID: userID, StoryID: storyID, CurrentSceneID: chapterSceneID, ChoicesMade: []uuid.UUID{earlierChoice}}
+	order := int32(7)
+
+	repo.On("GetProgress", mock.Anything, userID, storyID).Return(existing, nil)
+	repo.On("GetScene", mock.Anything, chapterSceneID).Return(chapterScene, nil)
+	repo.On("ListChoiceIDsFromEarlierScenes", mock.Anything, chapterScene, existing.ChoicesMade).
+		Return(map[uuid.UUID]bool{earlierChoice: true}, nil)
+	repo.On("UpdateProgress", mock.Anything, userID, storyID, chapterSceneID, []uuid.UUID{earlierChoice}).Return(restarted, nil)
+	publisher.On("Publish", mock.Anything, "player.story.restarted",
+		PlayerStoryRestartedEvent{UserID: userID, StoryID: storyID, FromOrder: &order}).Return(nil)
+
+	progress, err := svc.RestartStory(context.Background(), userID, storyID, &chapterSceneID)
+
+	require.NoError(t, err)
+	assert.Equal(t, restarted, progress)
+	publisher.AssertExpectations(t)
+}
+
+func TestService_RestartStory_RejectsASceneFromAnotherStory(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, storyID, foreignSceneID := uuid.New(), uuid.New(), uuid.New()
+	repo.On("GetProgress", mock.Anything, userID, storyID).Return(Progress{UserID: userID, StoryID: storyID}, nil)
+	repo.On("GetScene", mock.Anything, foreignSceneID).Return(Scene{ID: foreignSceneID, StoryID: uuid.New()}, nil)
+
+	_, err := svc.RestartStory(context.Background(), userID, storyID, &foreignSceneID)
+
+	require.Error(t, err)
+	repo.AssertNotCalled(t, "UpdateProgress", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}

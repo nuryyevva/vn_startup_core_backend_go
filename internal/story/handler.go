@@ -25,6 +25,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router, auth fiber.Handler) {
 	router.Get("/stories/:id", h.getStory)
 	router.Get("/progress", auth, h.listMyProgress)
 	router.Get("/stories/:id/progress", auth, h.getProgress)
+	router.Post("/stories/:id/restart", auth, h.restartStory)
 	router.Get("/stories/:id/scenes", auth, h.listStoryScenes)
 	router.Get("/scenes/:id", auth, h.getScene)
 	router.Post("/scenes/:id/choice", auth, h.submitChoice)
@@ -135,6 +136,43 @@ func (h *Handler) getProgress(c *fiber.Ctx) error {
 	}
 
 	progress, err := h.service.GetOrCreateProgress(c.Context(), userID, storyID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(toProgressResponse(progress))
+}
+
+func (h *Handler) restartStory(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	storyID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return apperr.BadRequest("invalid_story_id", "Некорректный идентификатор истории")
+	}
+
+	// Optional body {"scene_id": ...}: start over from that scene (a chapter's first scene) instead of the beginning.
+	var body struct {
+		SceneID string `json:"scene_id"`
+	}
+	var fromScene *uuid.UUID
+	if len(c.Body()) > 0 {
+		if err := c.BodyParser(&body); err != nil {
+			return apperr.BadRequest("invalid_body", "Некорректное тело запроса")
+		}
+		if body.SceneID != "" {
+			id, err := uuid.Parse(body.SceneID)
+			if err != nil {
+				return apperr.BadRequest("invalid_scene_id", "Некорректный идентификатор сцены")
+			}
+			fromScene = &id
+		}
+	}
+
+	progress, err := h.service.RestartStory(c.Context(), userID, storyID, fromScene)
 	if err != nil {
 		return err
 	}

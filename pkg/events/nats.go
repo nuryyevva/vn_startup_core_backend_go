@@ -23,6 +23,9 @@ var StreamSubjects = []string{"player.>", "dialog.>", "ai.>"}
 // Subjects published by this service.
 const (
 	SubjectPlayerChoiceMade   = "player.choice.made"
+	// SubjectPlayerStoryRestarted: the player started a story over; the AI module forgets what the characters
+	// of that story remember about them.
+	SubjectPlayerStoryRestarted = "player.story.restarted"
 	SubjectDialogSessionStart = "dialog.session.started"
 	SubjectDialogMessageSent  = "dialog.message.sent"
 	SubjectDialogSessionEnded = "dialog.session.ended"

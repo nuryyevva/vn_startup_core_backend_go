@@ -396,6 +396,7 @@ make export-content
 | GET | `/stories/:id` | нет | одна опубликованная история по id (`404 story_not_found`, если не опубликована) |
 | GET | `/progress` | да | прогресс игрока по ВСЕМ историям, где он уже что-то начал (без побочных эффектов — ничего не создаёт), с полем `is_finished` |
 | GET | `/stories/:id/progress` | да | текущий прогресс игрока по истории (создаётся, если нет) |
+| POST | `/stories/:id/restart` | да | начать историю заново: прогресс возвращается на первую сцену без выборов; с телом `{"scene_id"}` (первая сцена главы) только до этой главы, выборы более ранних сцен сохраняются; публикуется `player.story.restarted` |
 | GET | `/stories/:id/scenes` | да | список сцен истории с флагом `is_unlocked` на каждой (для списка глав) |
 | GET | `/scenes/:id` | да | данные сцены (фон, диалог-каркас, доступные выборы); `402 scene_locked`, если сцена платная и ещё не разблокирована |
 | POST | `/scenes/:id/choice` | да | отправить выбор игрока → сохранить прогресс + событие в NATS |
@@ -420,6 +421,7 @@ make export-content
 
 **Публикует Core Backend:**
 
+- `player.story.restarted` — `{ user_id, story_id, from_order? }`: игрок начал историю заново (или с главы, `from_order` — порядок её первой сцены); ИИ-модуль стирает память персонажей этой истории о нём: всю или только начиная с этой сцены
 - `player.choice.made` — `{ user_id, story_id, scene_id, choice_id }`
 - `dialog.session.started` — `{ session_id, user_id, character_id, scene_id }`
 - `dialog.message.sent` — `{ session_id, message_id, user_id, character_id, text, remaining_limit }`
@@ -429,7 +431,7 @@ make export-content
 
 - `ai.response.ready` — `{ user_id, scene_id, response_text }` → доставляется в WS
 - `ai.dialog.response.chunk` — `{ session_id, message_id, chunk_text }` → доставляется в WS
-- `ai.dialog.response.complete` — `{ session_id, message_id, full_text }` → сохраняется в `dialog_messages` (sender=character) и доставляется в WS
+- `ai.dialog.response.complete` — `{ session_id, message_id, full_text, emotion?, sprite_url? }` → сохраняется в `dialog_messages` (sender=character) и доставляется в WS; `emotion` и `sprite_url` необязательны: ИИ называет эмоцию реплики и подходящий ей спрайт персонажа
 - `ai.session.finalized` — `{ session_id }` → лог-подтверждение
 
 ## WebSocket-протокол
@@ -438,7 +440,7 @@ make export-content
 
 ```json
 { "type": "ai_response_chunk", "session_id": "...", "chunk": "..." }
-{ "type": "ai_response_complete", "session_id": "...", "text": "..." }
+{ "type": "ai_response_complete", "session_id": "...", "text": "...", "emotion": "sad", "sprite_url": "/media/..." }
 { "type": "session_ended", "session_id": "...", "reason": "time_limit" }
 { "type": "ai_response_ready", "scene_id": "...", "text": "..." }
 ```

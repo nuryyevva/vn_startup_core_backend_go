@@ -169,6 +169,74 @@ func (s *Service) GetOrCreateProgress(ctx context.Context, userID, storyID uuid.
 	return s.repo.CreateProgress(ctx, userID, storyID, firstScene.ID)
 }
 
+// RestartStory takes the player back and tells the AI module to forget what the story's characters remember about
+// them from that point on.
+//
+// With fromSceneID nil the whole story starts over: first scene, no choices made, nothing remembered. With a scene
+// (the first scene of a chapter) the player returns to it, keeps the choices they made before it and loses the ones
+// made at or after it; the characters keep what they remembered from earlier scenes and forget the rest.
+func (s *Service) RestartStory(ctx context.Context, userID, storyID uuid.UUID, fromSceneID *uuid.UUID) (Progress, error) {
+	progress, err := s.GetOrCreateProgress(ctx, userID, storyID)
+	if err != nil {
+		return Progress{}, err
+	}
+
+	target, err := s.restartTarget(ctx, storyID, fromSceneID)
+	if err != nil {
+		return Progress{}, err
+	}
+
+	kept := []uuid.UUID{}
+	var fromOrder *int32
+	if fromSceneID != nil {
+		earlier, err := s.repo.ListChoiceIDsFromEarlierScenes(ctx, target, progress.ChoicesMade)
+		if err != nil {
+			return Progress{}, err
+		}
+		for _, id := range progress.ChoicesMade {
+			if earlier[id] {
+				kept = append(kept, id)
+			}
+		}
+		fromOrder = &target.OrderIndex
+	}
+
+	restarted, err := s.repo.UpdateProgress(ctx, userID, storyID, target.ID, kept)
+	if err != nil {
+		return Progress{}, err
+	}
+
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, events.SubjectPlayerStoryRestarted, PlayerStoryRestartedEvent{
+			UserID:    userID,
+			StoryID:   storyID,
+			FromOrder: fromOrder,
+		}); err != nil {
+			s.logger.Error("publish player.story.restarted failed", slog.String("error", err.Error()))
+		}
+	}
+
+	return restarted, nil
+}
+
+// restartTarget is the scene a restart returns to: the story's first scene, or fromSceneID, which must belong to the
+// story.
+func (s *Service) restartTarget(ctx context.Context, storyID uuid.UUID, fromSceneID *uuid.UUID) (Scene, error) {
+	if fromSceneID == nil {
+		return s.repo.GetFirstScene(ctx, storyID)
+	}
+	scene, err := s.repo.GetScene(ctx, *fromSceneID)
+	if err != nil {
+		if errors.Is(err, ErrSceneNotFound) {
+			return Scene{}, apperr.NotFound("scene_not_found", "Сцена не найдена")
+		}
+		return Scene{}, err
+	}
+	if scene.StoryID != storyID {
+		return Scene{}, apperr.BadRequest("scene_not_in_story", "Эта сцена не из этой истории")
+	}
+	return scene, nil
+}
 // ListMyProgress returns every story userID has made progress on, most
 // recently updated first — the data source for the stories screen's
 // "Continue Reading" section and the profile screen's "My Library" /
