@@ -21,9 +21,12 @@ var fogOverBlackwoodStoryID = uuid.MustParse("33333333-3333-3333-3333-3333333333
 
 // Characters the player can talk to freely. These IDs are the link to the AI
 // module: its characters/<name>/card.yaml files carry the same `id`. Where each
-// of them can be talked to is set with .talksWith(...) on the beats below
-// (s2.hall Noah, s2.meet Lucy, s2.damian Damian, s4.watch Adrian, s5.room
-// Morgan); Evelyn is the player's own character and has no card.
+// of them can be talked to is set with .talksWith(...) on the beats below.
+// Only beats where it is natural to stay and chat for a while and the character
+// is still present get it (s2.hall and s3.noah Noah, s2.lucy Lucy, s2.damian
+// Damian, s4.watch and s6.road Adrian, s5.room Morgan); the button stays for the
+// whole beat, so it never goes on a beat the character leaves. Evelyn is the
+// player's own character and has no card.
 var (
 	bwAdrianID = uuid.MustParse("33333333-3333-3333-3333-3333333333a1")
 	bwDamianID = uuid.MustParse("33333333-3333-3333-3333-3333333333a2")
@@ -275,7 +278,7 @@ func sceneTwo(g *storyGraph) {
 		noah.say("Ной Картер. Кофе лишний."),
 		evelyn.say("Ты всегда покупаешь кофе незнакомым людям?"),
 		noah.say("Только тем, кто уже пострадал от нашего сэндвича."),
-	).titled("Люди за дальним столом").talksWith(bwNoahID, noah.sprite, bwTalkMessages)
+	).titled("Люди за дальним столом")
 
 	g.link(from("s2.cafeteria"), "Принять помощь", "s2.hall",
 		evelyn.say("Эвелин Морроу. И, кажется, ты только что спас мне завтрак."),
@@ -351,7 +354,7 @@ func sceneTwo(g *storyGraph) {
 		noah.say("Вейлы."),
 		evelyn.say("По твоему тону я должна была всё понять."),
 		noah.say("Просто держись с ними осторожнее."),
-	).talksWith(bwNoahID, noah.sprite, bwTalkMessages)
+	)
 	g.link(from("s2.vails"), "Попросить факты", "s2.approach",
 		evelyn.say("Они кому-нибудь что-то сделали?"),
 		noah.say("Мне — нет."),
@@ -403,7 +406,7 @@ func sceneTwo(g *storyGraph) {
 		narr("Адриан не отвечает.").show(adrian),
 		thought("Кажется, я случайно попала в чужую ссору.").show(evelyn),
 		narr("Вейлы уходят. Люси оборачивается и прощально поднимает руку.").show(lucy),
-	).talksWith(bwLucyID, lucy.sprite, bwTalkMessages)
+	)
 }
 
 // --- Сцена 3. Расстояние в пятьдесят метров ---
@@ -637,7 +640,7 @@ func sceneFive(g *storyGraph) {
 		morgan.say("Она оставила его вам?"),
 		evelyn.say("Просила отдать лично."),
 		narr("Он протягивает руку.").show(morgan),
-	).titled("Чужая подпись").talksWith(bwMorganID, morgan.sprite, bwTalkMessages)
+	).titled("Чужая подпись")
 
 	keyGiven := g.link(from("s5.archive"), "Отдать ключ", "s5.room",
 		narr("Морган берёт ключ осторожно, проводит большим пальцем по синей нитке.").show(morgan),
@@ -688,7 +691,7 @@ func sceneFive(g *storyGraph) {
 		morgan.say("Её нашли дома."),
 		evelyn.say("Это разные вещи."),
 		narr("Он снимает очки.").show(morgan),
-	).talksWith(bwMorganID, morgan.sprite, bwTalkMessages)
+	)
 	g.link(from("s5.journal"), "Попросить по-человечески", "s5.goodbye",
 		evelynSad.say("Я даже не успела с ней попрощаться. Пожалуйста, не заставляйте меня выпрашивать каждое слово."),
 		narr("Морган долго смотрит на журнал.").show(morgan),
@@ -759,7 +762,7 @@ func sceneSix(g *storyGraph) {
 		adrian.say("Дорога размыта."),
 		evelyn.say("Это должно меня остановить?"),
 		adrian.say("Нет. Поэтому я здесь."),
-	).titled("Третья ступенька").talksWith(bwAdrianID, adrian.sprite, bwTalkMessages)
+	).titled("Третья ступенька")
 
 	g.link(from("s6.porch"), "Поехать вместе", "s6.road",
 		evelyn.say("Хорошо. Но по дороге ты расскажешь, что делал с ней у озера."),

@@ -112,8 +112,8 @@ func TestFogOverBlackwood_TalkBeats(t *testing.T) {
 		id    uuid.UUID
 		beats int
 	}{
-		"Адриан": {bwAdrianID, 3}, "Дэмиан": {bwDamianID, 1}, "Люси": {bwLucyID, 2},
-		"Ной": {bwNoahID, 4}, "Морган": {bwMorganID, 3},
+		"Адриан": {bwAdrianID, 2}, "Дэмиан": {bwDamianID, 1}, "Люси": {bwLucyID, 1},
+		"Ной": {bwNoahID, 2}, "Морган": {bwMorganID, 1},
 	} {
 		assert.Equal(t, want.beats, talkers[want.id], "%s: number of talk beats", name)
 	}
