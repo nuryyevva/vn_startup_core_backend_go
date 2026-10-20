@@ -146,12 +146,19 @@ type aiDialogResponseCompletePayload struct {
 	SessionID uuid.UUID `json:"session_id"`
 	MessageID uuid.UUID `json:"message_id"`
 	FullText  string    `json:"full_text"`
+	// Emotion and SpriteURL are optional: the AI module names the emotion of
+	// the reply and the character sprite that matches it, so the client can
+	// switch the character's picture along with the line.
+	Emotion   string `json:"emotion,omitempty"`
+	SpriteURL string `json:"sprite_url,omitempty"`
 }
 
 type wsAIResponseComplete struct {
 	Type      string    `json:"type"`
 	SessionID uuid.UUID `json:"session_id"`
 	Text      string    `json:"text"`
+	Emotion   string    `json:"emotion,omitempty"`
+	SpriteURL string    `json:"sprite_url,omitempty"`
 }
 
 func (s *Subscriber) handleResponseComplete(ctx context.Context, msg jetstream.Msg) {
@@ -169,6 +176,8 @@ func (s *Subscriber) handleResponseComplete(ctx context.Context, msg jetstream.M
 		Type:      "ai_response_complete",
 		SessionID: payload.SessionID,
 		Text:      payload.FullText,
+		Emotion:   payload.Emotion,
+		SpriteURL: payload.SpriteURL,
 	})
 }
 
