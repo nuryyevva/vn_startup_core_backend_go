@@ -12,13 +12,26 @@ import (
 
 const minPasswordLength = 8
 
+type BonusGranter interface {
+	GrantSignupBonus(ctx context.Context, userID uuid.UUID, amount int32) error
+}
+
 type Service struct {
-	repo   Repository
-	issuer *TokenIssuer
+	repo        Repository
+	issuer      *TokenIssuer
+	bonus       BonusGranter
+	bonusAmount int32
 }
 
 func NewService(repo Repository, issuer *TokenIssuer) *Service {
 	return &Service{repo: repo, issuer: issuer}
+}
+
+// WithSignupBonus makes Register credit amount diamonds to every new user.
+func (s *Service) WithSignupBonus(granter BonusGranter, amount int32) *Service {
+	s.bonus = granter
+	s.bonusAmount = amount
+	return s
 }
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (User, TokenPair, error) {
@@ -40,6 +53,12 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (User, Toke
 			return User{}, TokenPair{}, apperr.Conflict("email_taken", "Этот email уже зарегистрирован")
 		}
 		return User{}, TokenPair{}, err
+	}
+
+	if s.bonus != nil {
+		if err := s.bonus.GrantSignupBonus(ctx, user.ID, s.bonusAmount); err != nil {
+			return User{}, TokenPair{}, err
+		}
 	}
 
 	tokens, err := s.issueTokens(user)

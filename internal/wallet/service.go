@@ -37,6 +37,15 @@ func (s *Service) Grant(ctx context.Context, userID uuid.UUID, amount int32) (Tr
 	return s.repo.Credit(ctx, userID, amount, ReasonDevGrant)
 }
 
+// GrantSignupBonus credits the starting diamonds of a freshly registered user; zero or negative amounts are a no-op.
+func (s *Service) GrantSignupBonus(ctx context.Context, userID uuid.UUID, amount int32) error {
+	if amount <= 0 {
+		return nil
+	}
+	_, err := s.repo.Credit(ctx, userID, amount, ReasonSignupBonus)
+	return err
+}
+
 // Debit satisfies the Wallet interface expected by the story and dialog
 // modules: charge amount diamonds to userID for reason, or fail with a
 // well-formed insufficient_funds error.

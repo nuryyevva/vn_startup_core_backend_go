@@ -74,6 +74,7 @@ type JWTConfig struct {
 type DialogConfig struct {
 	SessionCheckInterval time.Duration `env:"DIALOG_SESSION_CHECK_INTERVAL" envDefault:"10s"`
 	DefaultMessageCost   int           `env:"DIALOG_DEFAULT_MESSAGE_COST" envDefault:"20"`
+	SignupBonus          int           `env:"SIGNUP_BONUS_DIAMONDS" envDefault:"1000"`
 }
 
 // DevConfig controls development-only conveniences that must never be

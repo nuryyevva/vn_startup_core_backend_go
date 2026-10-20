@@ -18,6 +18,7 @@ const (
 	ReasonDevGrant       = "dev_grant"
 	ReasonChoicePurchase = "choice_purchase"
 	ReasonDialogMessage  = "dialog_message"
+	ReasonSignupBonus    = "signup_bonus"
 )
 
 type BalanceResponse struct {

@@ -81,9 +81,9 @@ func run() error {
 	achievementRepo := achievement.NewPostgresRepository(pool)
 
 	// --- services (wired in dependency order) ---
-	authService := auth.NewService(authRepo, tokenIssuer)
 	userService := user.NewService(userRepo)
 	walletService := wallet.NewService(walletRepo)
+	authService := auth.NewService(authRepo, tokenIssuer).WithSignupBonus(walletService, int32(cfg.Dialog.SignupBonus))
 	storyService := story.NewService(storyRepo, walletService, publisher, log)
 	dialogService := dialog.NewService(
 		dialogRepo,
