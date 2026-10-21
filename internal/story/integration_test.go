@@ -121,3 +121,36 @@ type walletSpy struct {
 func (w walletSpy) Debit(_ context.Context, userID uuid.UUID, amount int32, reason string) error {
 	return w.debit(userID, amount, reason)
 }
+
+func TestStoryIntegration_SceneSpriteFraming(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in -short mode")
+	}
+
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+
+	storyID := uuid.New()
+	defaultID := uuid.New()
+	closeUpID := uuid.New()
+
+	_, err := pool.Exec(ctx, `INSERT INTO stories (id, title, is_published) VALUES ($1, $2, true)`, storyID, "Framed Story")
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `INSERT INTO scenes (id, story_id, order_index, dialogue_script) VALUES ($1,$2,0,'[]')`, defaultID, storyID)
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `INSERT INTO scenes (id, story_id, order_index, dialogue_script, sprite_framing) VALUES ($1,$2,1,'[]','knees')`, closeUpID, storyID)
+	require.NoError(t, err)
+
+	repo := story.NewPostgresRepository(pool)
+
+	sc, err := repo.GetScene(ctx, defaultID)
+	require.NoError(t, err)
+	assert.Equal(t, story.SpriteFramingFull, sc.SpriteFraming, "scenes without a framing open on the full figure")
+
+	sc, err = repo.GetScene(ctx, closeUpID)
+	require.NoError(t, err)
+	assert.Equal(t, story.SpriteFramingKnees, sc.SpriteFraming)
+
+	_, err = pool.Exec(ctx, `UPDATE scenes SET sprite_framing = 'waist' WHERE id = $1`, closeUpID)
+	assert.Error(t, err, "only the shots the client knows are allowed")
+}

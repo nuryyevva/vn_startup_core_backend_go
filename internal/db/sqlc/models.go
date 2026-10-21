@@ -68,6 +68,7 @@ type Scene struct {
 	BackgroundMusicUrl pgtype.Text `json:"background_music_url"`
 	Title              pgtype.Text `json:"title"`
 	ChapterTitle       pgtype.Text `json:"chapter_title"`
+	SpriteFraming      string      `json:"sprite_framing"`
 }
 
 type SceneUnlock struct {

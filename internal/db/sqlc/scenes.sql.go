@@ -47,7 +47,7 @@ func (q *Queries) GetChoice(ctx context.Context, id uuid.UUID) (Choice, error) {
 }
 
 const getScene = `-- name: GetScene :one
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title FROM scenes WHERE id = $1
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title, sprite_framing FROM scenes WHERE id = $1
 `
 
 func (q *Queries) GetScene(ctx context.Context, id uuid.UUID) (Scene, error) {
@@ -69,6 +69,7 @@ func (q *Queries) GetScene(ctx context.Context, id uuid.UUID) (Scene, error) {
 		&i.BackgroundMusicUrl,
 		&i.Title,
 		&i.ChapterTitle,
+		&i.SpriteFraming,
 	)
 	return i, err
 }
@@ -195,7 +196,7 @@ func (q *Queries) ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]
 }
 
 const listScenesByStory = `-- name: ListScenesByStory :many
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title FROM scenes WHERE story_id = $1 ORDER BY order_index ASC
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title, sprite_framing FROM scenes WHERE story_id = $1 ORDER BY order_index ASC
 `
 
 func (q *Queries) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error) {
@@ -223,6 +224,7 @@ func (q *Queries) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]S
 			&i.BackgroundMusicUrl,
 			&i.Title,
 			&i.ChapterTitle,
+			&i.SpriteFraming,
 		); err != nil {
 			return nil, err
 		}

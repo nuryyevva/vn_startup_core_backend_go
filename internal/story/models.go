@@ -24,6 +24,23 @@ type Story struct {
 	PlayerTheme json.RawMessage
 }
 
+// SpriteFraming is how close the camera is on the character sprite: the
+// whole figure, or a closer shot cropped just below the knees. It names the
+// shot only; the client decides how much of the image that is. Stored in
+// scenes.sprite_framing (migration 0019) as the shot a scene opens with, and
+// switchable per dialogue_script line ("sprite_framing").
+type SpriteFraming string
+
+const (
+	SpriteFramingFull  SpriteFraming = "full"
+	SpriteFramingKnees SpriteFraming = "knees"
+)
+
+// Valid reports whether f is one of the shots scenes.sprite_framing allows.
+func (f SpriteFraming) Valid() bool {
+	return f == SpriteFramingFull || f == SpriteFramingKnees
+}
+
 type Scene struct {
 	ID                 uuid.UUID
 	StoryID            uuid.UUID
@@ -37,6 +54,7 @@ type Scene struct {
 	CreatedAt          time.Time
 	UnlockCostDiamonds *int32
 	CharacterSpriteURL *string
+	SpriteFraming      SpriteFraming
 	BackgroundMusicURL *string
 	// ChapterTitle is set only on the scene that starts a chapter, Title
 	// only on scenes that start a named section inside one. Branching
@@ -152,6 +170,7 @@ type SceneResponse struct {
 	DialogLimitValue   *int32           `json:"dialog_limit_value,omitempty"`
 	UnlockCostDiamonds *int32           `json:"unlock_cost_diamonds,omitempty"`
 	CharacterSpriteURL *string          `json:"character_sprite_url,omitempty"`
+	SpriteFraming      SpriteFraming    `json:"sprite_framing"`
 	BackgroundMusicURL *string          `json:"background_music_url,omitempty"`
 	ChapterTitle       *string          `json:"chapter_title,omitempty"`
 	Title              *string          `json:"title,omitempty"`
@@ -217,6 +236,7 @@ func toSceneResponse(s Scene, choices []Choice) SceneResponse {
 		DialogLimitValue:   s.DialogLimitValue,
 		UnlockCostDiamonds: s.UnlockCostDiamonds,
 		CharacterSpriteURL: s.CharacterSpriteURL,
+		SpriteFraming:      s.SpriteFraming,
 		BackgroundMusicURL: s.BackgroundMusicURL,
 		ChapterTitle:       s.ChapterTitle,
 		Title:              s.Title,
