@@ -36,7 +36,7 @@ var (
 )
 
 // bwTalkMessages is the free-dialog message limit of every talk beat; 0 means no limit.
-const bwTalkMessages = 0
+const bwTalkMessages = 15
 
 const blackwoodMedia = "/media/stories/fog-over-blackwood/"
 
