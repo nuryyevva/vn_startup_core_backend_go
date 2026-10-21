@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"math/rand"
 	"strings"
 
 	"github.com/google/uuid"
@@ -44,13 +42,15 @@ const (
 	bwCover = blackwoodMedia + "cover.webp"
 
 	// Soundtrack. Sources and licences: media/stories/fog-over-blackwood/CREDITS.md.
-	bwTrackTender  = blackwoodMedia + "audio/tender_moment.mp3"
-	bwTrackComa    = blackwoodMedia + "audio/Marilyn_Manson_Coma_White_Acoustic_Cover.mp3"
-	bwTrackMystery = blackwoodMedia + "audio/kevin_macleod_comfortable_mystery.mp3"
-	bwTrackLights  = blackwoodMedia + "audio/alyosha_thousand_lights_minus.mp3"
+	bwTrackNarrative = blackwoodMedia + "audio/%D0%BF%D0%BE%D0%B2%D0%B5%D1%81%D1%82%D0%B2%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D0%BD%D0%B0%D1%8F.mp3"
+	bwTrackTense     = blackwoodMedia + "audio/%D0%BD%D0%B0%D0%BF%D1%80%D1%8F%D0%B6%D0%B5%D0%BD%D0%BD%D0%B0%D1%8F_%D0%BA%D0%BE%D0%BD%D0%B5%D1%86_%D0%BC%D0%BE%D0%B6%D0%BD%D0%BE_%D0%BE%D0%B1%D1%80%D0%B5%D0%B7%D0%B0%D1%82%D1%8C.mp3"
+	bwTrackCalm      = blackwoodMedia + "audio/%D1%80%D0%BE%D0%BC%D0%B0%D0%BD%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F%2C%20%D1%81%D0%BF%D0%BE%D0%BA%D0%BE%D0%B9%D0%BD%D0%B0%D1%8F.mp3"
+	bwTrackSad       = blackwoodMedia + "audio/%D1%80%D0%BE%D0%BC%D0%B0%D0%BD%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F%2C%20%D1%87%D1%83%D1%82%D1%8C%20%D0%B3%D1%80%D1%83%D1%81%D1%82%D0%BD%D0%B0%D1%8F.mp3"
+	bwTrackBackdrop  = blackwoodMedia + "audio/%D1%84%D0%BE%D0%BD.mp3"
+	bwTrackAmbient   = blackwoodMedia + "audio/%D1%84%D0%BE%D0%BD%D0%BE%D0%B2%D0%B0%D1%8F.mp3"
 
 	// Default track, used by any beat musicFor has no pick for.
-	bwMusic = bwTrackComa
+	bwMusic = bwTrackBackdrop
 
 	bwHouseExterior    = blackwoodMedia + "backgrounds/grandma_house_exterior.webp"
 	bwKitchen          = blackwoodMedia + "backgrounds/grandma_kitchen.webp"
@@ -83,30 +83,24 @@ var (
 
 func from(keys ...string) []string { return keys }
 
-// bwMusicSeed fixes the "random" soundtrack layout so re-running the seed
-// never reshuffles it. Change it to roll a different layout.
-const bwMusicSeed = 7
+// bwSectionTracks gives each of the story's eight sections (beat keys "s1.*" …
+// "s8.*") a track by its mood: a switch of track happens only at a section
+// border, since the client restarts the music whenever the URL changes.
+var bwSectionTracks = map[string]string{
+	"s1": bwTrackNarrative, // arrival at the grandmother's house
+	"s2": bwTrackAmbient,   // university cafeteria, meeting the Vails
+	"s3": bwTrackTense,     // the accident in the parking lot
+	"s4": bwTrackBackdrop,  // old building corridor, Adrian, the key
+	"s5": bwTrackNarrative, // archive, the journal
+	"s6": bwTrackCalm,      // the road with Adrian, the forester's house
+	"s7": bwTrackTense,     // searching the forester's house, the vision
+	"s8": bwTrackSad,       // the choice and the ending
+}
 
-// bwSectionMusic gives each of the story's eight sections (beat keys "s1.*" …
-// "s8.*") one of the tracks, picked at random but never the same track in two
-// neighbouring sections — a switch of track happens only at a section border,
-// since the client restarts the music whenever the URL changes.
 func bwSectionMusic() func(beatKey string) string {
-	tracks := []string{bwTrackTender, bwTrackComa, bwTrackMystery, bwTrackLights}
-	rng := rand.New(rand.NewSource(bwMusicSeed))
-	bySection := map[string]string{}
-	prev := ""
-	for i := 1; i <= 8; i++ {
-		track := tracks[rng.Intn(len(tracks))]
-		for track == prev {
-			track = tracks[rng.Intn(len(tracks))]
-		}
-		bySection[fmt.Sprintf("s%d", i)] = track
-		prev = track
-	}
 	return func(beatKey string) string {
 		section, _, _ := strings.Cut(beatKey, ".")
-		return bySection[section]
+		return bwSectionTracks[section]
 	}
 }
 

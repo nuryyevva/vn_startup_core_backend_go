@@ -232,7 +232,10 @@ func (e exporter) media(ctx context.Context, raw string) (string, error) {
 	case raw == "":
 		return "", nil
 	case strings.HasPrefix(raw, "/media/"):
-		rel := strings.TrimPrefix(raw, "/media/")
+		rel, err := url.PathUnescape(strings.TrimPrefix(raw, "/media/"))
+		if err != nil {
+			return "", fmt.Errorf("decode %s: %w", raw, err)
+		}
 		if err := copyFile(filepath.Join(e.mediaDir, filepath.FromSlash(rel)), e.bundlePath(raw)); err != nil {
 			return "", fmt.Errorf("copy %s: %w", raw, err)
 		}
