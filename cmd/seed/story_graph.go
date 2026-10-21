@@ -180,7 +180,7 @@ type graphBeat struct {
 type talkTo struct {
 	characterID uuid.UUID
 	sprite      string // shown whenever no line has chosen a sprite yet
-	messages    int32  // free-dialog message limit
+	messages    int32  // free-dialog message limit; zero or less means no limit
 }
 
 type graphLink struct {
@@ -371,8 +371,12 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 				sc.characterSpriteURL = strPtr(t.sprite)
 			}
 			sc.freeDialogEnabled = true
-			sc.dialogLimitType = strPtr("messages")
-			sc.dialogLimitValue = i32Ptr(t.messages)
+			if t.messages > 0 {
+				sc.dialogLimitType = strPtr("messages")
+				sc.dialogLimitValue = i32Ptr(t.messages)
+			} else {
+				sc.dialogLimitType = strPtr("none")
+			}
 		}
 		scenes = append(scenes, sc)
 	}

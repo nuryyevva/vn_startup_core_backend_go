@@ -35,8 +35,8 @@ var (
 	bwMorganID = uuid.MustParse("33333333-3333-3333-3333-3333333333a5")
 )
 
-// bwTalkMessages is the free-dialog message limit of every talk beat.
-const bwTalkMessages = 8
+// bwTalkMessages is the free-dialog message limit of every talk beat; 0 means no limit.
+const bwTalkMessages = 0
 
 const blackwoodMedia = "/media/stories/fog-over-blackwood/"
 

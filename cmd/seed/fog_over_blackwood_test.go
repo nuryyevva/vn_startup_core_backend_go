@@ -100,9 +100,8 @@ func TestFogOverBlackwood_TalkBeats(t *testing.T) {
 		}
 		require.NotNil(t, sc.characterID)
 		require.NotNil(t, sc.dialogLimitType)
-		require.NotNil(t, sc.dialogLimitValue)
-		assert.Equal(t, "messages", *sc.dialogLimitType)
-		assert.Positive(t, *sc.dialogLimitValue)
+		assert.Equal(t, "none", *sc.dialogLimitType)
+		assert.Nil(t, sc.dialogLimitValue)
 		assert.NotNil(t, sc.characterSpriteURL, "talk beat needs a sprite so the client doesn't fall back to a silhouette")
 		talkers[*sc.characterID]++
 	}
