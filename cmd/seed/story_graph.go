@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+
+	domain "vn_startup_core_backend_go/internal/story"
 )
 
 // This file is a small authoring helper for branching stories. The data
@@ -24,7 +26,16 @@ import (
 //     play on return.
 //   - Lines are the dialogue_script JSON objects the client already renders
 //     ({"speaker","text","sfx_url"}), extended with sticky per-line
-//     background/sprite switches and the `when` condition — see scriptLine.
+//     background/sprite/framing switches and the `when` condition — see
+//     scriptLine.
+//
+// Sprite framing (how close the camera is on the character, see
+// domain.SpriteFraming) mostly follows the place: storyGraph.framingFor maps
+// a background to its usual shot, and build applies it both to the scene
+// (scenes.sprite_framing) and to every line that switches the background.
+// A beat can override its opening shot with graphBeat.framed, a line with
+// scriptLine.framed — e.g. pulling back to the full figure for a moment
+// that is about the whole body (someone stepping back, rising).
 
 // scriptLine is one entry of scenes.dialogue_script.
 type scriptLine struct {
@@ -37,7 +48,11 @@ type scriptLine struct {
 	SpriteURL *string `json:"sprite_url,omitempty"`
 	// BackgroundURL switches the background from this line on.
 	BackgroundURL string `json:"background_url,omitempty"`
-	SfxURL        string `json:"sfx_url,omitempty"`
+	// SpriteFraming switches the shot from this line on. Like the other
+	// switches it sticks until another line changes it, so a line that pulls
+	// back for one moment needs a later line that moves in again.
+	SpriteFraming domain.SpriteFraming `json:"sprite_framing,omitempty"`
+	SfxURL        string               `json:"sfx_url,omitempty"`
 	// When lists conditions that must all hold for the line to be shown.
 	When []lineCondition `json:"when,omitempty"`
 }
@@ -91,6 +106,12 @@ func (l scriptLine) bg(url string) scriptLine {
 	return l
 }
 
+// framed switches the sprite framing from this line on (see SpriteFraming).
+func (l scriptLine) framed(f domain.SpriteFraming) scriptLine {
+	l.SpriteFraming = f
+	return l
+}
+
 func (l scriptLine) when(c lineCondition) scriptLine {
 	l.When = append(append([]lineCondition{}, l.When...), c)
 	return l
@@ -133,10 +154,13 @@ type storyGraph struct {
 	// stretch of the story: the client restarts the track whenever the URL
 	// changes between beats.
 	musicFor func(beatKey string) string
-	beats    []*graphBeat
-	byKey   map[string]*graphBeat
-	links   []*graphLink
-	nextPos map[string]int
+	// framingFor, when set, gives the usual sprite framing for a background
+	// URL (empty = no opinion, i.e. the full figure). See the file comment.
+	framingFor func(backgroundURL string) domain.SpriteFraming
+	beats      []*graphBeat
+	byKey      map[string]*graphBeat
+	links      []*graphLink
+	nextPos    map[string]int
 }
 
 type graphBeat struct {
@@ -144,6 +168,7 @@ type graphBeat struct {
 	chapter *string
 	title   *string
 	bg      string
+	framing domain.SpriteFraming // overrides framingFor(bg) when set
 	lines   []scriptLine
 	talk    *talkTo
 }
@@ -186,6 +211,13 @@ func (g *storyGraph) beat(key, bg string, lines ...scriptLine) *graphBeat {
 // linger (hubs): the "talk" button sits next to the beat's choices.
 func (b *graphBeat) talksWith(characterID uuid.UUID, sprite string, messages int32) *graphBeat {
 	b.talk = &talkTo{characterID: characterID, sprite: sprite, messages: messages}
+	return b
+}
+
+// framed sets the shot the beat opens with, overriding the one its
+// background would get from storyGraph.framingFor.
+func (b *graphBeat) framed(f domain.SpriteFraming) *graphBeat {
+	b.framing = f
 	return b
 }
 
@@ -296,9 +328,18 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 
 	scenes := make([]scene, 0, len(g.beats))
 	for i, b := range g.beats {
-		script := append(scripts[b.key], b.lines...)
-		if len(script) == 0 {
-			script = []scriptLine{}
+		script := g.applyFraming(append(scripts[b.key], b.lines...))
+		framing := b.framing
+		if framing == "" {
+			framing = g.framingOf(b.bg)
+		}
+		if !framing.Valid() {
+			return nil, nil, fmt.Errorf("beat %q has unknown sprite framing %q", b.key, framing)
+		}
+		for _, line := range script {
+			if line.SpriteFraming != "" && !line.SpriteFraming.Valid() {
+				return nil, nil, fmt.Errorf("a line of beat %q has unknown sprite framing %q", b.key, line.SpriteFraming)
+			}
 		}
 		raw, err := json.Marshal(script)
 		if err != nil {
@@ -318,6 +359,7 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 			id:                 g.sceneID(b.key),
 			orderIndex:         i,
 			backgroundURL:      b.bg,
+			spriteFraming:      framing,
 			backgroundMusicURL: music,
 			dialogueScript:     string(raw),
 			chapterTitle:       b.chapter,
@@ -353,4 +395,29 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 	}
 
 	return scenes, choices, nil
+}
+
+// framingOf is the usual shot for a background (full figure unless
+// framingFor says otherwise).
+func (g *storyGraph) framingOf(backgroundURL string) domain.SpriteFraming {
+	if g.framingFor != nil {
+		if f := g.framingFor(backgroundURL); f != "" {
+			return f
+		}
+	}
+	return domain.SpriteFramingFull
+}
+
+// applyFraming gives every line that switches the background the shot that
+// background usually gets, unless the line picks one itself. Works on a
+// copy: a link's lines are shared by every beat it leads to.
+func (g *storyGraph) applyFraming(script []scriptLine) []scriptLine {
+	out := make([]scriptLine, len(script))
+	for i, line := range script {
+		if line.BackgroundURL != "" && line.SpriteFraming == "" {
+			line.SpriteFraming = g.framingOf(line.BackgroundURL)
+		}
+		out[i] = line
+	}
+	return out
 }

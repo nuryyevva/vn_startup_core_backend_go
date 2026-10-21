@@ -58,6 +58,7 @@ type exportedScene struct {
 	DialogLimitValue   *int32           `json:"dialog_limit_value,omitempty"`
 	UnlockCostDiamonds *int32           `json:"unlock_cost_diamonds,omitempty"`
 	CharacterSpriteURL *string          `json:"character_sprite_url,omitempty"`
+	SpriteFraming      string           `json:"sprite_framing"`
 	BackgroundMusicURL *string          `json:"background_music_url,omitempty"`
 	ChapterTitle       *string          `json:"chapter_title,omitempty"`
 	Title              *string          `json:"title,omitempty"`
@@ -186,6 +187,7 @@ func (e exporter) scene(ctx context.Context, s story, sc scene, choices []choice
 		DialogLimitValue:   sc.dialogLimitValue,
 		UnlockCostDiamonds: sc.unlockCostDiamonds,
 		CharacterSpriteURL: sprite,
+		SpriteFraming:      string(sc.framing()),
 		BackgroundMusicURL: music,
 		ChapterTitle:       sc.chapterTitle,
 		Title:              sc.title,

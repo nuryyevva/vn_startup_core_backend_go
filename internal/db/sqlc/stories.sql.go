@@ -41,7 +41,7 @@ func (q *Queries) CountPublishedStories(ctx context.Context, genre pgtype.Text) 
 }
 
 const getFirstSceneOfStory = `-- name: GetFirstSceneOfStory :one
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title FROM scenes WHERE story_id = $1 ORDER BY order_index ASC LIMIT 1
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title, sprite_framing FROM scenes WHERE story_id = $1 ORDER BY order_index ASC LIMIT 1
 `
 
 func (q *Queries) GetFirstSceneOfStory(ctx context.Context, storyID uuid.UUID) (Scene, error) {
@@ -63,6 +63,7 @@ func (q *Queries) GetFirstSceneOfStory(ctx context.Context, storyID uuid.UUID) (
 		&i.BackgroundMusicUrl,
 		&i.Title,
 		&i.ChapterTitle,
+		&i.SpriteFraming,
 	)
 	return i, err
 }

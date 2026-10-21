@@ -30,6 +30,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"vn_startup_core_backend_go/internal/config"
+	domain "vn_startup_core_backend_go/internal/story"
 	"vn_startup_core_backend_go/pkg/logger"
 )
 
@@ -112,6 +113,7 @@ type scene struct {
 	backgroundURL      string
 	characterID        *uuid.UUID
 	characterSpriteURL *string
+	spriteFraming      domain.SpriteFraming // "" = the full figure
 	backgroundMusicURL *string
 	dialogueScript     string // JSON array literal
 	freeDialogEnabled  bool
@@ -130,6 +132,14 @@ type choice struct {
 	costDiamonds int32
 	nextSceneID  *uuid.UUID
 	onceKey      *string // see migration 0017_choices_once_key
+}
+
+// framing is the scene's opening shot, defaulting to the full figure.
+func (sc scene) framing() domain.SpriteFraming {
+	if sc.spriteFraming == "" {
+		return domain.SpriteFramingFull
+	}
+	return sc.spriteFraming
 }
 
 func strPtr(s string) *string        { return &s }
@@ -168,18 +178,19 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 
 	for _, sc := range s.scenes {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, character_sprite_url, background_music_url, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds, title, chapter_title)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, character_sprite_url, background_music_url, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds, title, chapter_title, sprite_framing)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 			 ON CONFLICT (id) DO UPDATE SET
 			     order_index = EXCLUDED.order_index, background_url = EXCLUDED.background_url,
 			     character_id = EXCLUDED.character_id, character_sprite_url = EXCLUDED.character_sprite_url,
 			     background_music_url = EXCLUDED.background_music_url, dialogue_script = EXCLUDED.dialogue_script,
 			     free_dialog_enabled = EXCLUDED.free_dialog_enabled, dialog_limit_type = EXCLUDED.dialog_limit_type,
 			     dialog_limit_value = EXCLUDED.dialog_limit_value, unlock_cost_diamonds = EXCLUDED.unlock_cost_diamonds,
-			     title = EXCLUDED.title, chapter_title = EXCLUDED.chapter_title`,
+			     title = EXCLUDED.title, chapter_title = EXCLUDED.chapter_title,
+			     sprite_framing = EXCLUDED.sprite_framing`,
 			sc.id, s.id, sc.orderIndex, sc.backgroundURL, sc.characterID, sc.characterSpriteURL, sc.backgroundMusicURL,
 			[]byte(sc.dialogueScript), sc.freeDialogEnabled, sc.dialogLimitType, sc.dialogLimitValue, sc.unlockCostDiamonds,
-			sc.title, sc.chapterTitle,
+			sc.title, sc.chapterTitle, sc.framing(),
 		); err != nil {
 			return fmt.Errorf("insert scene %s: %w", sc.id, err)
 		}

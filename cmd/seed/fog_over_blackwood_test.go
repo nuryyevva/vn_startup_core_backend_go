@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"sort"
 	"testing"
 
@@ -132,5 +133,39 @@ func TestFogOverBlackwood_IDsAreStable(t *testing.T) {
 	}
 	for i := range a.choices {
 		assert.Equal(t, a.choices[i].id, b.choices[i].id)
+	}
+}
+
+func TestFogOverBlackwood_SpriteFraming(t *testing.T) {
+	s, err := fogOverBlackwoodStory()
+	require.NoError(t, err)
+
+	g := newStoryGraph(fogOverBlackwoodStoryID)
+	byKey := map[string]scene{}
+	for _, sc := range s.scenes {
+		byKey[sc.id.String()] = sc
+	}
+	opening := func(key string) string { return string(byKey[g.sceneID(key).String()].spriteFraming) }
+
+	assert.Equal(t, "full", opening("s1.arrival"), "outdoors: the whole figure")
+	assert.Equal(t, "knees", opening("s2.meet"), "cafeteria table: closer")
+	assert.Equal(t, "full", opening("s4.watch"), "watching Adrian down the corridor")
+	assert.Equal(t, "knees", opening("s4.talk"), "talking face to face in the same corridor")
+	// s6.road opens on the porch (the reaction to the porch choice) and then
+	// cuts to the car.
+	var road []scriptLine
+	require.NoError(t, json.Unmarshal([]byte(byKey[g.sceneID("s6.road").String()].dialogueScript), &road))
+	cut := slices.IndexFunc(road, func(l scriptLine) bool { return l.BackgroundURL == bwCarInterior })
+	require.NotEqual(t, -1, cut)
+	assert.Equal(t, "knees", string(road[cut].SpriteFraming), "inside the car")
+
+	for _, sc := range s.scenes {
+		var lines []scriptLine
+		require.NoError(t, json.Unmarshal([]byte(sc.dialogueScript), &lines))
+		for _, l := range lines {
+			if l.BackgroundURL != "" {
+				assert.NotEmpty(t, l.SpriteFraming, "a background switch must set its shot (%q)", l.Text)
+			}
+		}
 	}
 }

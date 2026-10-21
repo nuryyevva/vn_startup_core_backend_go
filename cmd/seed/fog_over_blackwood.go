@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
+	domain "vn_startup_core_backend_go/internal/story"
 )
 
 // "Туман над Блэквудом", episode 1 "Чужая память" — an original branching
@@ -64,22 +66,70 @@ const (
 	bwForesterInterior = blackwoodMedia + "backgrounds/forester_house_interior.webp"
 )
 
+// Full-height sprites, one file per emotion: <character>_<emotion>.webp.
+// The emotions (and the sprites the AI module may pick in free dialogue):
+// neutral, worried (startled/alarmed), angry (stern, closed off), sad
+// (guilty, embarrassed, grieving), smile; Evelyn and Adrian also have laugh
+// and laugh_hard, Morgan has tired (hand at his glasses) instead of smile.
+// Noah and the car driver only have one sprite so far.
+func bwSprite(file string) string { return blackwoodMedia + "sprites/" + file + ".webp" }
+
 var (
-	evelyn        = portrait{"Эвелин", blackwoodMedia + "sprites/evelyn_neutral.webp"}
-	evelynSad     = portrait{"Эвелин", blackwoodMedia + "sprites/evelyn_sad.webp"}
-	evelynWorried = portrait{"Эвелин", blackwoodMedia + "sprites/evelyn_worried.webp"}
-	adrian        = portrait{"Адриан", blackwoodMedia + "sprites/adrian.webp"}
-	damian        = portrait{"Дэмиан", blackwoodMedia + "sprites/damian.webp"}
-	lucy          = portrait{"Люси", blackwoodMedia + "sprites/lucy.webp"}
-	noah          = portrait{"Ной", blackwoodMedia + "sprites/noah.webp"}
-	morgan        = portrait{"Морган", blackwoodMedia + "sprites/morgan.webp"}
-	taxiDriver    = portrait{"Водитель", blackwoodMedia + "sprites/taxi_driver.webp"}
-	carDriver     = portrait{"Водитель", blackwoodMedia + "sprites/car_driver.webp"}
+	evelyn        = portrait{"Эвелин", bwSprite("evelyn_neutral")}
+	evelynSad     = portrait{"Эвелин", bwSprite("evelyn_sad")}
+	evelynWorried = portrait{"Эвелин", bwSprite("evelyn_worried")}
+	evelynAngry   = portrait{"Эвелин", bwSprite("evelyn_angry")}
+	evelynSmile   = portrait{"Эвелин", bwSprite("evelyn_smile")}
+
+	adrian        = portrait{"Адриан", bwSprite("adrian_neutral")}
+	adrianSad     = portrait{"Адриан", bwSprite("adrian_sad")}
+	adrianWorried = portrait{"Адриан", bwSprite("adrian_worried")}
+	adrianAngry   = portrait{"Адриан", bwSprite("adrian_angry")}
+	adrianSmile   = portrait{"Адриан", bwSprite("adrian_smile")}
+
+	damian      = portrait{"Дэмиан", bwSprite("damian_neutral")}
+	damianSmile = portrait{"Дэмиан", bwSprite("damian_smile")}
+
+	lucy      = portrait{"Люси", bwSprite("lucy_neutral")}
+	lucySmile = portrait{"Люси", bwSprite("lucy_smile")}
+
+	morgan        = portrait{"Морган", bwSprite("morgan_neutral")}
+	morganSad     = portrait{"Морган", bwSprite("morgan_sad")}
+	morganWorried = portrait{"Морган", bwSprite("morgan_worried")}
+	morganAngry   = portrait{"Морган", bwSprite("morgan_angry")}
+	morganTired   = portrait{"Морган", bwSprite("morgan_tired")}
+
+	taxiDriver      = portrait{"Водитель", bwSprite("taxi_driver_neutral")}
+	taxiDriverSad   = portrait{"Водитель", bwSprite("taxi_driver_sad")}
+	taxiDriverSmile = portrait{"Водитель", bwSprite("taxi_driver_smile")}
+
+	noah      = portrait{"Ной", bwSprite("noah")}
+	carDriver = portrait{"Водитель", bwSprite("car_driver")}
 	// Only ever seen in visions/memories, through someone else's eyes — no
 	// sprite on screen.
 	grandma        = portrait{"Бабушка", ""}
 	adrianInMemory = portrait{"Адриан", ""}
 )
+
+// Sprite framing. The camera follows the place: in cramped rooms — the car,
+// the kitchen table, the cafeteria, the archive, the forester's single room —
+// it sits closer and the sprites are cut just below the knees; outdoors, on
+// the parking lot and in the long corridor it shows the whole figure. On top
+// of that a few moments override the shot (see .framed in the scenes below):
+// someone rising, stepping back or walking past pulls back to the full
+// figure, a face-to-face confrontation in the corridor moves in.
+const (
+	bwFull  = domain.SpriteFramingFull
+	bwKnees = domain.SpriteFramingKnees
+)
+
+func bwFramingFor(backgroundURL string) domain.SpriteFraming {
+	switch backgroundURL {
+	case bwCarInterior, bwKitchen, bwCafeteria, bwArchive, bwForesterInterior:
+		return bwKnees
+	}
+	return bwFull
+}
 
 func from(keys ...string) []string { return keys }
 
@@ -114,6 +164,7 @@ func fogOverBlackwoodStory() (story, error) {
 	g := newStoryGraph(fogOverBlackwoodStoryID)
 	g.music = bwMusic
 	g.musicFor = bwSectionMusic()
+	g.framingFor = bwFramingFor
 
 	sceneOne(g)
 	sceneTwo(g)
@@ -162,8 +213,8 @@ func sceneOne(g *storyGraph) {
 		evelyn.say("Вы видели её незадолго до смерти?"),
 		taxiDriver.say("Подвозил пару раз. Из университета."),
 		evelynSad.say("Она выглядела больной?"),
-		taxiDriver.say("Уставшей. Но сумку мне не разрешила нести. Сказала, у меня спина хуже её."),
-		narr("Эвелин впервые за весь день улыбается.").show(evelyn),
+		taxiDriverSmile.say("Уставшей. Но сумку мне не разрешила нести. Сказала, у меня спина хуже её."),
+		narr("Эвелин впервые за весь день улыбается.").show(evelynSmile),
 		thought("Да. Это на неё похоже. Хотя бы что-то здесь пока похоже на правду."),
 		narr("Водитель оставляет визитку на чемодане.").show(taxiDriver),
 		taxiDriver.say("Если понадобится машина, звоните."),
@@ -171,14 +222,14 @@ func sceneOne(g *storyGraph) {
 	)
 	g.link(from("s1.arrival"), "Спросить, почему он смотрит на дом", "s1.inside",
 		evelynWorried.say("С домом что-то не так?"),
-		taxiDriver.say("Нет, просто непривычно без света."),
+		taxiDriverSad.say("Нет, просто непривычно без света."),
 		narr("Он кивает на кухонное окно."),
-		taxiDriver.say("Она всегда оставляла там лампу."),
+		taxiDriverSad.say("Она всегда оставляла там лампу."),
 		thought("Я тоже это помню. Возвращаешься с улицы и ещё от калитки знаешь, что тебя ждут.").show(evelynSad),
 	)
 	g.link(from("s1.arrival"), "Завершить разговор", "s1.inside",
 		evelyn.say("Спасибо, дальше я сама."),
-		taxiDriver.say("Конечно. Примите мои соболезнования."),
+		taxiDriverSad.say("Конечно. Примите мои соболезнования."),
 		narr("Он помогает поставить чемодан под навес и уезжает."),
 		thought("Я не могу ещё раз слушать, какой хорошей она была. Не сегодня.").show(evelynSad),
 	)
@@ -272,19 +323,19 @@ func sceneTwo(g *storyGraph) {
 		narr("Эвелин пытается открыть сэндвич. Упаковка рвётся, половина начинки падает на поднос."),
 		noah.say("Поздравляю. Теперь он выглядит так же, как на вкус."),
 		narr("Рядом останавливается парень с двумя стаканами кофе."),
-		evelyn.say("Это официальная экскурсия для новеньких?"),
+		evelynSmile.say("Это официальная экскурсия для новеньких?"),
 		noah.say("Нет. На официальной говорят, что еда нормальная."),
 		narr("Он ставит один стакан перед ней."),
 		noah.say("Ной Картер. Кофе лишний."),
-		evelyn.say("Ты всегда покупаешь кофе незнакомым людям?"),
+		evelynSmile.say("Ты всегда покупаешь кофе незнакомым людям?"),
 		noah.say("Только тем, кто уже пострадал от нашего сэндвича."),
 	).titled("Люди за дальним столом")
 
 	g.link(from("s2.cafeteria"), "Принять помощь", "s2.hall",
-		evelyn.say("Эвелин Морроу. И, кажется, ты только что спас мне завтрак."),
+		evelynSmile.say("Эвелин Морроу. И, кажется, ты только что спас мне завтрак."),
 		noah.say("Не преувеличивай. Кофе тоже отсюда."),
 		narr("Он садится без прежней неловкости."),
-		thought("С ним легко. Я уже успела забыть, как это бывает.").show(evelyn),
+		thought("С ним легко. Я уже успела забыть, как это бывает.").show(evelynSmile),
 		narr("Ной охотно рассказывает о городе, а потом сам предлагает обменяться номерами.").show(noah),
 	)
 	g.link(from("s2.cafeteria"), "Держать дистанцию", "s2.hall",
@@ -323,7 +374,7 @@ func sceneTwo(g *storyGraph) {
 	g.beat("s2.damian", bwCafeteria,
 		narr("Дэмиан замечает её взгляд раньше, чем она успевает отвернуться.").show(damian),
 		damian.say("Если хочешь что-то спросить — спрашивай. Я не кусаюсь. Пока не доказано обратное."),
-		narr("Кольцо на его пальце делает ещё один оборот."),
+		narr("Кольцо на его пальце делает ещё один оборот.").show(damianSmile),
 	).talksWith(bwDamianID, damian.sprite, bwTalkMessages)
 	g.link(from("s2.damian"), "Вернуться к Ною", "s2.hall",
 		evelyn.say("Не сегодня."),
@@ -332,11 +383,11 @@ func sceneTwo(g *storyGraph) {
 
 	// Like s2.damian: the player may talk to Lucy before the scheduled meeting.
 	g.beat("s2.lucy", bwCafeteria,
-		narr("Стоит Эвелин задержать на ней взгляд, Люси поднимает голову и улыбается.").show(lucy),
+		narr("Стоит Эвелин задержать на ней взгляд, Люси поднимает голову и улыбается.").show(lucySmile),
 		thought("Она заметила меня раньше, чем я решила на неё посмотреть. Или мне просто неловко, что я пялюсь."),
 	).talksWith(bwLucyID, lucy.sprite, bwTalkMessages)
 	g.link(from("s2.lucy"), "Вернуться к Ною", "s2.hall",
-		narr("Люси машет ей и возвращается к тетради.").show(lucy),
+		narr("Люси машет ей и возвращается к тетради.").show(lucySmile),
 	)
 
 	g.beat("s2.board", bwCafeteria,
@@ -379,33 +430,33 @@ func sceneTwo(g *storyGraph) {
 
 	g.beat("s2.approach", bwCafeteria)
 	g.link(from("s2.approach"), "Подойти к Вейлам", "s2.meet",
-		narr("Эвелин подходит к дальнему столу. Первой её приветствует Люси.").show(lucy),
+		narr("Эвелин подходит к дальнему столу. Первой её приветствует Люси.").show(lucySmile),
 	)
 	g.link(from("s2.approach"), "Остаться на месте", "s2.meet",
-		narr("Эвелин остаётся на месте. Чуть позже Люси сама подходит к её столу.").show(lucy),
+		narr("Эвелин остаётся на месте. Чуть позже Люси сама подходит к её столу.").show(lucySmile),
 	)
 
 	g.beat("s2.meet", bwCafeteria,
-		lucy.say("Эвелин, да? Морган говорил, что ты приедешь."),
-		evelyn.say("Кажется, я единственный человек в городе, который не знает, кто такой Морган."),
-		narr("Люси смеётся.").show(lucy),
+		lucySmile.say("Эвелин, да? Морган говорил, что ты приедешь."),
+		evelynSmile.say("Кажется, я единственный человек в городе, который не знает, кто такой Морган."),
+		narr("Люси смеётся.").show(lucySmile),
 		narr("Рядом появляется Адриан.").show(adrian),
-		adrian.say("Люси, нам пора."),
+		adrianAngry.say("Люси, нам пора."),
 		lucy.say("У нас ещё десять минут."),
 		narr("Эвелин достаёт фотографию из блокнота.").show(evelyn),
 		evelyn.say("Тогда у меня короткий вопрос. Где это?"),
 		narr("Люси наклоняется.").show(lucy),
 		lucy.say("Озеро Без Эха. Северный берег."),
-		narr("Адриан смотрит на бабушку на снимке.").show(adrian),
+		narr("Адриан смотрит на бабушку на снимке.").show(adrianWorried),
 		narr("Его выражение меняется так быстро, что Эвелин не успевает понять как."),
-		adrian.say("Там давно нечего делать."),
+		adrianAngry.say("Там давно нечего делать."),
 		evelyn.say("Часто бываешь?"),
-		adrian.say("Я никогда не был у озера."),
-		narr("Дэмиан, проходящий мимо с подносом, задерживается.").show(damian),
-		damian.say("Тогда откуда тебе знать?"),
-		narr("Адриан не отвечает.").show(adrian),
+		adrianAngry.say("Я никогда не был у озера."),
+		narr("Дэмиан, проходящий мимо с подносом, задерживается.").show(damian).framed(bwFull),
+		damianSmile.say("Тогда откуда тебе знать?"),
+		narr("Адриан не отвечает.").show(adrianAngry).framed(bwKnees),
 		thought("Кажется, я случайно попала в чужую ссору.").show(evelyn),
-		narr("Вейлы уходят. Люси оборачивается и прощально поднимает руку.").show(lucy),
+		narr("Вейлы уходят. Люси оборачивается и прощально поднимает руку.").show(lucySmile).framed(bwFull),
 	)
 }
 
@@ -432,14 +483,14 @@ func sceneThree(g *storyGraph) (hasPhoto, noPhoto lineCondition) {
 		narr("Она успевает увидеть лицо водителя и собственное отражение в лобовом стекле."),
 		narr("Кто-то хватает её за запястье."),
 		narr("Удар."),
-		narr("Адриан стоит между ней и машиной. Его ладонь упирается в капот. Металл продавлен вокруг пальцев.").show(adrian),
+		narr("Адриан стоит между ней и машиной. Его ладонь упирается в капот. Металл продавлен вокруг пальцев.").show(adrianAngry),
 		thought("Он был у корпуса."),
 		narr("Следом приходит другое изображение."),
 		narr("Тёмная комната. Синий свет. Бабушка стоит возле деревянного стола. На рукаве кровь.").bg(bwForesterInterior).hide(),
 		grandma.say("Не отдавай…"),
 		narr("Всё исчезает."),
-		narr("Адриан резко отпускает Эвелин.").bg(bwParking).show(adrian),
-		adrian.say("Ты ударилась?"),
+		narr("Адриан резко отпускает Эвелин.").bg(bwParking).show(adrianWorried),
+		adrianWorried.say("Ты ударилась?"),
 	).titled("Расстояние в пятьдесят метров")
 
 	// Whichever reaction comes first, Evelyn brings up the vision before
@@ -447,7 +498,7 @@ func sceneThree(g *storyGraph) (hasPhoto, noPhoto lineCondition) {
 	mentionLater := []scriptLine{
 		narr("Адриан уже собирается уйти.").show(adrian),
 		evelynWorried.say("Подожди. Я видела свою бабушку."),
-		narr("Его лицо меняется.").show(adrian),
+		narr("Его лицо меняется.").show(adrianWorried),
 		adrian.say("Тебе нужен врач."),
 	}
 	g.link(from("s3.parking"), "Как ты успел?", "s3.aftermath", append([]scriptLine{
@@ -467,8 +518,8 @@ func sceneThree(g *storyGraph) (hasPhoto, noPhoto lineCondition) {
 	}, mentionLater...)...)
 	g.link(from("s3.parking"), "Рассказать о видении", "s3.aftermath",
 		evelynWorried.say("Я видела свою бабушку."),
-		narr("Его лицо меняется.").show(adrian),
-		adrian.say("Что?"),
+		narr("Его лицо меняется.").show(adrianWorried),
+		adrianWorried.say("Что?"),
 		evelynWorried.say("Только что."),
 		narr("Он медленно отпускает край её мокрого рукава.").show(adrian),
 		adrian.say("Тебе нужен врач."),
@@ -561,64 +612,64 @@ func sceneFour(g *storyGraph, hasPhoto, noPhoto lineCondition) {
 		evelyn.say("Врач сказал, с головой у меня всё в порядке."),
 		narr("Адриан закрывает книгу.").show(adrian),
 		adrian.say("Хорошо."),
-		evelyn.say("Это портит твою версию?"),
+		evelynAngry.say("Это портит твою версию?"),
 		adrian.say("Ты испугалась. В такие моменты память…"),
-		evelyn.say("Осторожнее со следующим словом."),
-	)
+		evelynAngry.say("Осторожнее со следующим словом."),
+	).framed(bwKnees)
 	g.link(from("s4.talk"), "Предъявить свидетельство", "s4.key",
-		evelyn.say("Ты оставил руку в металле.").when(hasPhoto),
+		evelynAngry.say("Ты оставил руку в металле.").when(hasPhoto),
 		narr("Эвелин показывает ему снимок.").when(hasPhoto),
 		adrian.say("Я вижу повреждённый капот.").when(hasPhoto),
-		evelyn.say("У тебя даже царапины нет.").when(hasPhoto),
+		evelynAngry.say("У тебя даже царапины нет.").when(hasPhoto),
 		narr("Он убирает руки в карманы.").show(adrian).when(hasPhoto),
-		evelyn.say("Я видела вмятину. Она повторяла твою ладонь.").when(noPhoto),
+		evelynAngry.say("Я видела вмятину. Она повторяла твою ладонь.").when(noPhoto),
 		adrian.say("Ты стояла рядом с машиной после удара. Неудивительно, что всё смешалось.").when(noPhoto),
 		thought("Он использует именно то, в чём я сама сомневаюсь.").show(evelynWorried).when(noPhoto),
 		narr("С этого момента Адриан осторожнее и отвечает короче.").show(adrian),
 	)
 	g.link(from("s4.talk"), "Начать с благодарности", "s4.key",
 		evelyn.say("Ты спас меня. Я ещё не сказала спасибо."),
-		narr("Он явно ожидал другого.").show(adrian),
-		adrian.say("Не за что."),
+		narr("Он явно ожидал другого.").show(adrianWorried),
+		adrianSad.say("Не за что."),
 		evelyn.say("Есть за что. Но я всё равно хочу понять, что произошло."),
 		adrian.say("Я понимаю."),
 		narr("Он остаётся в разговоре и перестаёт притворяться, что торопится."),
 	)
 	g.link(from("s4.talk"), "Спросить о бабушке", "s4.key",
 		evelyn.say("Почему ты испугался, когда я сказала про бабушку?"),
-		adrian.say("Я не испугался."),
-		evelyn.say("Тогда посмотри на меня и скажи, что не знал её."),
-		narr("Он смотрит. Но нужных слов не произносит.").show(adrian),
+		adrianAngry.say("Я не испугался."),
+		evelynAngry.say("Тогда посмотри на меня и скажи, что не знал её."),
+		narr("Он смотрит. Но нужных слов не произносит.").show(adrianSad),
 		thought("Вот. Я не получила ответа. Но он хотя бы перестал отрицать всё подряд.").show(evelyn),
 	)
 
 	g.beat("s4.key", bwCorridor,
 		narr("Эвелин достаёт ключ с синей ниткой.").show(evelyn),
 		evelyn.say("Она оставила мне это."),
-		narr("Адриан сразу узнаёт его.").show(adrian),
+		narr("Адриан сразу узнаёт его.").show(adrianWorried),
 		adrian.say("Отдай Моргану."),
 		evelyn.say("Я не говорила, что собираюсь к нему."),
 		narr("Пауза."),
-	)
+	).framed(bwKnees)
 	g.link(from("s4.key"), "Надавить", "s4.leave",
-		evelyn.say("Сколько ещё ты знаешь обо мне?"),
+		evelynAngry.say("Сколько ещё ты знаешь обо мне?"),
 		adrian.say("Меньше, чем ты думаешь."),
-		evelyn.say("Очень удобная формулировка."),
+		evelynAngry.say("Очень удобная формулировка."),
 	)
 	g.link(from("s4.key"), "Дать ему объясниться", "s4.leave",
 		evelynSad.say("Если ты знал её, просто скажи. Мне сейчас не так много людей могут о ней рассказать."),
-		narr("Он отворачивается к окну.").show(adrian),
-		adrian.say("Я знал её."),
+		narr("Он отворачивается к окну.").show(adrianSad),
+		adrianSad.say("Я знал её."),
 		narr("Это первое прямое признание."),
 	)
 
 	g.beat("s4.leave", bwCorridor,
 		evelyn.say("Чего ты от меня хочешь?"),
-		adrian.say("Чтобы ты уехала."),
+		adrianAngry.say("Чтобы ты уехала."),
 		thought("Вот это прозвучало честно. Жаль, что именно это.").show(evelynSad),
 		narr("Дверь аудитории открывается. Коридор наполняется студентами.").hide(),
 		narr("Адриан уходит вместе с потоком."),
-	)
+	).framed(bwKnees)
 }
 
 // --- Сцена 5. Чужая подпись ---
@@ -629,28 +680,28 @@ func sceneFive(g *storyGraph) {
 	g.beat("s5.archive", bwArchive,
 		narr("Архив находится в полуподвале. Узкие окна расположены почти под потолком, и с улицы через них видны только ноги прохожих.").hide(),
 		narr("В комнате пахнет бумагой, пылью и кофе. Вдоль стен стоят высокие металлические стеллажи. На столе у окна — старая настольная лампа с зелёным абажуром."),
-		narr("Профессор Морган сидит среди коробок. Когда входит Эвелин, он встаёт слишком быстро и задевает коленом стол.").show(morgan),
-		morgan.say("Простите. Вы очень на неё похожи."),
+		narr("Профессор Морган сидит среди коробок. Когда входит Эвелин, он встаёт слишком быстро и задевает коленом стол.").show(morganWorried).framed(bwFull),
+		morganWorried.say("Простите. Вы очень на неё похожи."),
 		evelyn.say("Все говорят."),
 		morgan.say("Она бы рассердилась. Считала, что люди обязаны быть похожи на себя."),
-		narr("Эвелин улыбается.").show(evelyn),
+		narr("Эвелин улыбается.").show(evelynSmile).framed(bwKnees),
 		thought("Он действительно её знал."),
 		narr("Она кладёт ключ на стол."),
-		narr("Улыбка Моргана исчезает.").show(morgan),
-		morgan.say("Она оставила его вам?"),
+		narr("Улыбка Моргана исчезает.").show(morganTired),
+		morganTired.say("Она оставила его вам?"),
 		evelyn.say("Просила отдать лично."),
 		narr("Он протягивает руку.").show(morgan),
 	).titled("Чужая подпись")
 
 	keyGiven := g.link(from("s5.archive"), "Отдать ключ", "s5.room",
-		narr("Морган берёт ключ осторожно, проводит большим пальцем по синей нитке.").show(morgan),
+		narr("Морган берёт ключ осторожно, проводит большим пальцем по синей нитке.").show(morganSad),
 		evelyn.say("Что он открывает?"),
 		morgan.say("Старый дом лесника. На северном берегу озера."),
-		narr("Он держит его так, будто это не ключ, а что-то, что можно сломать.").show(morgan),
+		narr("Он держит его так, будто это не ключ, а что-то, что можно сломать.").show(morganSad),
 	)
 	keyKept := g.link(from("s5.archive"), "Придержать ключ", "s5.room",
 		narr("Эвелин накрывает ключ ладонью.").show(evelyn),
-		evelyn.say("Сначала объясните."),
+		evelynAngry.say("Сначала объясните."),
 		narr("Морган убирает руку.").show(morgan),
 		morgan.say("Справедливо."),
 		narr("Он рассказывает о старом доме лесника на северном берегу озера, но следит за тем, куда Эвелин смотрит."),
@@ -686,26 +737,26 @@ func sceneFive(g *storyGraph) {
 		thought("Инициал — не имя. Я пока не знаю, что это Адриан. Но сколько Вейлов нужно встретить за два дня, чтобы перестать считать это совпадением?").show(evelynWorried),
 		narr("Эвелин поворачивает журнал к Моргану."),
 		evelyn.say("Она умерла дома."),
-		narr("Морган молчит.").show(morgan),
+		narr("Морган молчит.").show(morganSad),
 		evelyn.say("Так мне сказали."),
-		morgan.say("Её нашли дома."),
-		evelyn.say("Это разные вещи."),
-		narr("Он снимает очки.").show(morgan),
+		morganSad.say("Её нашли дома."),
+		evelynAngry.say("Это разные вещи."),
+		narr("Он снимает очки.").show(morganTired),
 	)
 	g.link(from("s5.journal"), "Попросить по-человечески", "s5.goodbye",
 		evelynSad.say("Я даже не успела с ней попрощаться. Пожалуйста, не заставляйте меня выпрашивать каждое слово."),
-		narr("Морган долго смотрит на журнал.").show(morgan),
-		morgan.say("Она работала там в тот вечер. Я должен был приехать, но не смог."),
+		narr("Морган долго смотрит на журнал.").show(morganSad),
+		morganSad.say("Она работала там в тот вечер. Я должен был приехать, но не смог."),
 		evelyn.say("Почему?"),
-		morgan.say("Решил, что успею завтра."),
+		morganSad.say("Решил, что успею завтра."),
 		narr("Он уже много раз отвечал на этот вопрос самому себе."),
 	)
 	g.link(from("s5.journal"), "Обвинить во лжи", "s5.goodbye",
-		evelynWorried.say("Вы все договорились? Врач, Вейлы, вы?"),
-		morgan.say("Я не знаю, что вам говорил врач."),
-		evelynWorried.say("А что не договорили вы, знаете?"),
-		narr("Он закрывает журнал.").show(morgan),
-		morgan.say("Да."),
+		evelynAngry.say("Вы все договорились? Врач, Вейлы, вы?"),
+		morganAngry.say("Я не знаю, что вам говорил врач."),
+		evelynAngry.say("А что не договорили вы, знаете?"),
+		narr("Он закрывает журнал.").show(morganAngry),
+		morganAngry.say("Да."),
 		narr("Ответ лишает Эвелин следующей реплики."),
 		narr("Больше Морган о личном не говорит."),
 	)
@@ -723,19 +774,19 @@ func sceneFive(g *storyGraph) {
 		narr("Морган возвращает ключ.").show(morgan).when(chosen(keyGiven, keyKept...)),
 		morgan.say("Там остались её записи. Я отвезу вас в субботу."),
 		evelyn.say("Через четыре дня?"),
-		morgan.say("Мне нужно время."),
-		evelyn.say("Мне тоже. Но вы уже решили, что можете его у меня забрать."),
+		morganTired.say("Мне нужно время."),
+		evelynAngry.say("Мне тоже. Но вы уже решили, что можете его у меня забрать."),
 		narr("Она забирает ключ.").show(evelyn),
-		narr("У двери профессор окликает её.").show(morgan),
-		morgan.say("Не ездите туда одна."),
+		narr("У двери профессор окликает её.").show(morganWorried),
+		morganWorried.say("Не ездите туда одна."),
 	)
 	g.link(from("s5.goodbye"), "«Тогда поедем сегодня»", "s5.door",
 		evelyn.say("Тогда поедем сегодня."),
-		morgan.say("Сегодня я не смогу."),
+		morganSad.say("Сегодня я не смогу."),
 	)
 	g.link(from("s5.goodbye"), "«Я ничего не обещаю»", "s5.door",
 		evelyn.say("Я ничего не обещаю."),
-		narr("По его лицу видно: он понимает, что она, скорее всего, поедет.").show(morgan),
+		narr("По его лицу видно: он понимает, что она, скорее всего, поедет.").show(morganTired),
 	)
 	g.link(from("s5.goodbye"), "Ничего не сказать", "s5.door",
 		narr("Эвелин молча уходит, оставив его смотреть на открытый журнал.").hide(),
@@ -758,9 +809,9 @@ func sceneSix(g *storyGraph) {
 		narr("На дорожке стоит Адриан.").show(adrian),
 		evelyn.say("Морган позвонил?"),
 		adrian.say("Да."),
-		evelyn.say("В следующий раз пусть попробует нормально ответить на вопросы. Это экономит время всем."),
+		evelynAngry.say("В следующий раз пусть попробует нормально ответить на вопросы. Это экономит время всем."),
 		adrian.say("Дорога размыта."),
-		evelyn.say("Это должно меня остановить?"),
+		evelynAngry.say("Это должно меня остановить?"),
 		adrian.say("Нет. Поэтому я здесь."),
 	).titled("Третья ступенька")
 
@@ -774,7 +825,7 @@ func sceneSix(g *storyGraph) {
 		evelyn.say("Я отправлю Ною, куда еду и с кем."),
 		narr("Адриан кивает.").show(adrian),
 		adrian.say("Отправь."),
-		evelyn.say("Ты даже не возражаешь?"),
+		evelynWorried.say("Ты даже не возражаешь?"),
 		adrian.say("Это разумно."),
 		narr("Ответ приходит почти сразу: «Жду сообщения, когда вернёшься»."),
 		thought("Хорошо, что хотя бы один человек знает, где меня искать.").show(evelyn),
@@ -804,17 +855,17 @@ func sceneSix(g *storyGraph) {
 		adrian.say("Она никому не позволяла решать за неё."),
 		evelyn.say("Это не ответ."),
 		narr("Он ненадолго смотрит на неё.").show(adrian),
-		adrian.say("Да. Нравилась."),
-		evelyn.say("Она и тебя ругала за мокрые ботинки?"),
-		narr("На его лице появляется короткая улыбка.").show(adrian),
-		adrian.say("За грязь на ступеньках."),
+		adrianSad.say("Да. Нравилась."),
+		evelynSmile.say("Она и тебя ругала за мокрые ботинки?"),
+		narr("На его лице появляется короткая улыбка.").show(adrianSmile),
+		adrianSmile.say("За грязь на ступеньках."),
 		thought("Я не хочу, чтобы он так о ней говорил. И одновременно хочу, чтобы не замолкал.").show(evelynSad),
 	}, arrival...)...)
 	g.link(from("s6.road"), "Спросить об озере", "s6.lodge", append([]scriptLine{
 		evelyn.say("Почему «Без Эха»?"),
 		adrian.say("По легенде оно ничего не возвращает."),
 		evelyn.say("Даже эхо?"),
-		adrian.say("Особенно то, что люди хотят услышать снова."),
+		adrianSad.say("Особенно то, что люди хотят услышать снова."),
 		narr("Эвелин смотрит в окно.").show(evelyn),
 		thought("Он пересказывает легенду или предупреждает меня?"),
 	}, arrival...)...)
@@ -846,18 +897,18 @@ func sceneSix(g *storyGraph) {
 
 	g.beat("s6.steps", bwForesterExterior,
 		narr("Эвелин ступает на крыльцо.").show(evelyn),
-		adrian.say("Не на третью ступеньку. Доска…"),
-		narr("Он замолкает.").show(adrian),
+		adrianWorried.say("Не на третью ступеньку. Доска…"),
+		narr("Он замолкает.").show(adrianSad),
 	)
 	g.link(from("s6.steps"), "Напомнить о разговоре в столовой", "s6.threshold",
-		evelyn.say("Ты никогда не был у озера."),
+		evelynAngry.say("Ты никогда не был у озера."),
 		narr("Адриан смотрит на неё.").show(adrian),
-		evelyn.say("Это ты сказал. Вчера."),
-		adrian.say("Я соврал."),
+		evelynAngry.say("Это ты сказал. Вчера."),
+		adrianSad.say("Я соврал."),
 		evelyn.say("Зачем?"),
-		adrian.say("Надеялся, что на этом разговор закончится."),
-		evelyn.say("Как видишь, стратегия не сработала."),
-		thought("Он признался сразу. От этого почему-то не становится легче."),
+		adrianSad.say("Надеялся, что на этом разговор закончится."),
+		evelynAngry.say("Как видишь, стратегия не сработала."),
+		thought("Он признался сразу. От этого почему-то не становится легче.").show(evelynSad),
 	)
 	g.link(from("s6.steps"), "Спросить без обвинений", "s6.threshold",
 		evelyn.say("Ты хорошо знаешь этот дом?"),
@@ -885,9 +936,9 @@ func sceneSeven(g *storyGraph) {
 		thought("Я видела его."),
 		narr("Она делает шаг в сторону. Меняется угол, но узнавание не проходит."),
 		thought("На парковке. Этот стол был там. Во вспышке."),
-		adrian.say("Что?"),
+		adrianWorried.say("Что?"),
 		evelynWorried.say("Пока не знаю."),
-		narr("Он остаётся возле двери, позволяя ей осмотреться.").show(adrian),
+		narr("Он остаётся возле двери, позволяя ей осмотреться.").show(adrian).framed(bwFull),
 	).titled("То, что осталось после неё")
 
 	explore := from("s7.room", "s7.search")
@@ -915,8 +966,8 @@ func sceneSeven(g *storyGraph) {
 	)
 	g.link(from("s7.book"), "Забрать книгу", "s7.search",
 		adrian.say("Она твоя."),
-		evelyn.say("Я не спрашивала разрешения."),
-		narr("Он опускает взгляд.").show(adrian),
+		evelynAngry.say("Я не спрашивала разрешения."),
+		narr("Он опускает взгляд.").show(adrianSad),
 	)
 	g.link(from("s7.book"), "Оставить на месте", "s7.search",
 		narr("Эвелин возвращает книгу на подоконник."),
@@ -958,26 +1009,26 @@ func sceneSeven(g *storyGraph) {
 	)
 	g.link(from("s7.vision"), "Рассказать всё", "s7.gift",
 		evelyn.say("Синий свет. Стол. Она сказала: «Не отдавай». А потом ты отпустил мою руку, и всё исчезло."),
-		narr("Адриан смотрит на её запястье.").show(adrian),
-		adrian.say("Раньше с тобой такое случалось?"),
+		narr("Адриан смотрит на её запястье.").show(adrianWorried),
+		adrianWorried.say("Раньше с тобой такое случалось?"),
 		evelyn.say("Нет."),
 	)
 	g.link(from("s7.vision"), "Скрыть часть", "s7.gift",
 		evelyn.say("Сначала скажи, что произошло. Потом я решу, чем делиться."),
-		adrian.say("Ты мне не доверяешь."),
-		evelyn.say("У меня были причины?"),
-		narr("Он принимает это без возражений.").show(adrian),
+		adrianSad.say("Ты мне не доверяешь."),
+		evelynAngry.say("У меня были причины?"),
+		narr("Он принимает это без возражений.").show(adrianSad),
 	)
 	g.link(from("s7.vision"), "Обвинить его", "s7.gift",
-		evelynWorried.say("Это ты сделал?"),
+		evelynAngry.say("Это ты сделал?"),
 		adrian.say("Нет."),
-		evelynWorried.say("Ты даже не спросил, что я имею в виду."),
-		adrian.say("Потому что понимаю."),
+		evelynAngry.say("Ты даже не спросил, что я имею в виду."),
+		adrianSad.say("Потому что понимаю."),
 		thought("Мне хотелось, чтобы он рассердился. Тогда было бы проще. А он выглядит так, будто я сказала то, что он сам повторяет себе каждую ночь."),
 	)
 
 	g.beat("s7.gift", bwForesterInterior,
-		narr("Эвелин делает шаг к нему. Адриан отступает, прежде чем их руки успевают соприкоснуться.").show(adrian),
+		narr("Эвелин делает шаг к нему. Адриан отступает, прежде чем их руки успевают соприкоснуться.").show(adrianWorried),
 		evelyn.say("Вот опять."),
 		adrian.say("Что?"),
 		evelyn.say("Ты ни разу не прикоснулся ко мне после аварии."),
@@ -986,17 +1037,17 @@ func sceneSeven(g *storyGraph) {
 		adrian.say("Нет."),
 		evelyn.say("Тогда чего?"),
 		narr("Он смотрит на её руку.").show(adrian),
-		adrian.say("Того, что ты увидишь."),
+		adrianSad.say("Того, что ты увидишь."),
 		narr("Эвелин вспоминает парковку. Его пальцы на запястье. Вспышку. То, как быстро он её отпустил.").show(evelynWorried),
 		thought("Это было не моё воспоминание."),
 		evelynWorried.say("Я увидела твою память?"),
 		adrian.say("Думаю, да."),
 		evelyn.say("Ты думаешь?"),
 		adrian.say("Обычно всё происходит наоборот."),
-		narr("Она отступает от него.").show(evelynWorried),
+		narr("Она отступает от него.").show(evelynWorried).framed(bwFull),
 		evelynWorried.say("Ты забираешь чужие воспоминания?"),
 		narr("Он не отвечает сразу.").show(adrian),
-		adrian.say("Могу."),
+		adrianSad.say("Могу."),
 		narr("Слово остаётся между ними."),
 	)
 	g.link(from("s7.gift"), "Испугаться", "s7.offer",
@@ -1004,16 +1055,16 @@ func sceneSeven(g *storyGraph) {
 		adrian.say("Нет."),
 		evelynWorried.say("Я бы заметила?"),
 		narr("Он медлит.").show(adrian),
-		adrian.say("Не всегда."),
-		narr("Эвелин отходит к двери.").show(evelynWorried),
+		adrianSad.say("Не всегда."),
+		narr("Эвелин отходит к двери.").show(evelynWorried).framed(bwFull),
 		thought("Я не могу даже проверить, хватает ли мне всех моих воспоминаний. Как вообще задавать следующий вопрос?"),
 	)
 	g.link(from("s7.gift"), "Разозлиться", "s7.offer",
-		evelyn.say("Поэтому тебе так удобно говорить, что мне показалось?"),
-		narr("Адриан опускает голову.").show(adrian),
-		adrian.say("Да. Это было удобно."),
-		evelyn.say("Больше так не делай."),
-		adrian.say("Не буду."),
+		evelynAngry.say("Поэтому тебе так удобно говорить, что мне показалось?"),
+		narr("Адриан опускает голову.").show(adrianSad),
+		adrianSad.say("Да. Это было удобно."),
+		evelynAngry.say("Больше так не делай."),
+		adrianSad.say("Не буду."),
 		thought("Обещание. Пока просто обещание.").show(evelyn),
 	)
 	g.link(from("s7.gift"), "Попытаться разобраться", "s7.offer",
@@ -1025,10 +1076,10 @@ func sceneSeven(g *storyGraph) {
 	)
 
 	g.beat("s7.offer", bwForesterInterior,
-		evelyn.say("У моей бабушки ты что-нибудь забрал?"),
+		evelyn.say("У моей бабушки ты что-нибудь забрал?").framed(bwKnees),
 		adrian.say("Нет."),
-		evelyn.say("Ты уже лгал мне."),
-		adrian.say("Да."),
+		evelynAngry.say("Ты уже лгал мне."),
+		adrianSad.say("Да."),
 		narr("Он снимает перчатку, которую надел перед дорогой, и кладёт на стол.").show(adrian),
 		narr("Протягивает открытую ладонь."),
 		adrian.say("Поэтому я не прошу тебя поверить. Ты можешь посмотреть."),
@@ -1121,31 +1172,31 @@ func sceneEight(g *storyGraph) {
 		narr("Камень раскалывается."),
 		narr("Свет гаснет."),
 		narr("Адриан успевает подхватить бабушку прежде, чем она падает."),
-		narr("Эвелин вырывает руку.").show(evelynWorried),
+		narr("Эвелин вырывает руку.").show(evelynWorried).framed(bwFull),
 		narr("Адриан сразу отпускает."),
 		narr("Она отступает и ударяется о стол. Лампа падает, катится по полу."),
 		narr("Тот же звук. Та же комната."),
-		narr("Только бабушки больше нет.").show(evelynSad),
+		narr("Только бабушки больше нет.").show(evelynSad).framed(bwKnees),
 		thought("Это случилось здесь. Пока я жила своей жизнью, она была здесь."),
-		narr("Адриан делает движение к ней.").show(adrian),
+		narr("Адриан делает движение к ней.").show(adrianWorried),
 		evelynSad.say("Не надо."),
-		narr("Он останавливается.").show(adrian),
+		narr("Он останавливается.").show(adrianSad),
 	)
 	g.link(from("s8.memory"), "Спросить о бабушке", "s8.reveal",
 		evelynSad.say("Она забыла меня."),
-		adrian.say("Не смогла вспомнить твоё имя."),
+		adrianSad.say("Не смогла вспомнить твоё имя."),
 		evelynSad.say("Какая разница?"),
 		narr("Он отвечает тихо:").show(adrian),
-		adrian.say("До последнего она знала, что должна тебя защитить."),
+		adrianSad.say("До последнего она знала, что должна тебя защитить."),
 		narr("Эвелин садится на стул.").show(evelynSad),
 		thought("Я хочу поверить ему. Хотя бы в этом."),
 	)
 	g.link(from("s8.memory"), "Обвинить Адриана", "s8.reveal",
 		evelynSad.say("Ты просто стоял рядом."),
-		narr("Он не защищается.").show(adrian),
-		adrian.say("Я пытался отвести её."),
-		evelynSad.say("Недостаточно."),
-		adrian.say("Знаю."),
+		narr("Он не защищается.").show(adrianSad),
+		adrianSad.say("Я пытался отвести её."),
+		evelynAngry.say("Недостаточно."),
+		adrianSad.say("Знаю."),
 		narr("Эвелин отворачивается.").show(evelynSad),
 		thought("Я видела его боль. Чувствовала, что он едва держался. И всё равно хочу, чтобы виноват был он. Потому что он здесь, а того, что её убило, здесь нет."),
 	)
@@ -1156,7 +1207,7 @@ func sceneEight(g *storyGraph) {
 		adrian.say("Да."),
 		evelyn.say("Кто?"),
 		narr("Он делает короткую паузу.").show(adrian),
-		adrian.say("Я."),
+		adrianSad.say("Я."),
 		thought("Хорошо. Ещё один факт. Пока я задаю вопросы, мне не нужно думать обо всём сразу.").show(evelyn),
 	)
 
@@ -1175,43 +1226,43 @@ func sceneEight(g *storyGraph) {
 		narr("Он молчит слишком долго.").show(adrian),
 		thought("Потому что он знает ещё что-то. Всё это время знал.").show(evelynWorried),
 		evelynWorried.say("Адриан."),
-		adrian.say("Печать не разрушилась сама."),
+		adrianSad.say("Печать не разрушилась сама."),
 		narr("Она медленно поворачивается к нему.").show(evelynWorried),
-		adrian.say("Кто-то из моей семьи ей помог."),
+		adrianSad.say("Кто-то из моей семьи ей помог."),
 	)
 	g.link(from("s8.reveal"), "Затемнение", "s8.end")
 
 	g.beat("s8.alt", bwForesterInterior,
 		narr("Эвелин остаётся по другую сторону стола.").show(evelyn),
-		evelyn.say("Ты предлагаешь мне залезть тебе в голову, потому что не можешь сказать правду вслух?"),
+		evelynAngry.say("Ты предлагаешь мне залезть тебе в голову, потому что не можешь сказать правду вслух?"),
 		adrian.say("Могу."),
 		evelyn.say("Тогда скажи."),
 		narr("Он садится на край стола.").show(adrian),
-		adrian.say("Я был здесь в ночь её смерти."),
+		adrianSad.say("Я был здесь в ночь её смерти."),
 		thought("Я знала. Подпись в журнале, его лицо, этот дом. Почему от произнесённых слов всё равно становится хуже?").show(evelynSad),
 		evelyn.say("Что произошло?"),
 		adrian.say("Она удерживала печать. То, что находится под озером, пыталось выбраться. Она не позволила."),
 		evelynSad.say("И умерла?"),
-		narr("Он кивает.").show(adrian),
+		narr("Он кивает.").show(adrianSad),
 	)
 	g.link(from("s8.alt"), "Потребовать доказательств", "s8.alt_end",
 		evelyn.say("У меня пока только твои слова."),
 		adrian.say("Да."),
-		evelyn.say("Значит, я проверю каждое."),
+		evelynAngry.say("Значит, я проверю каждое."),
 		adrian.say("Проверяй."),
 		thought("На этот раз я не позволю одному человеку объяснить мне всё так, как ему удобно.").show(evelyn),
 	)
 	g.link(from("s8.alt"), "Спросить о его роли", "s8.alt_end",
 		evelyn.say("А ты что делал?"),
 		adrian.say("Пытался её спасти."),
-		evelyn.say("Получилось не очень."),
+		evelynAngry.say("Получилось не очень."),
 		narr("Он принимает эти слова, не отводя глаз.").show(adrian),
 		thought("Он даже не оправдывается. Это может быть вина. А может быть то, что я хочу принять за вину.").show(evelyn),
 	)
 	g.link(from("s8.alt"), "Спросить о последних словах", "s8.alt_end",
 		evelynSad.say("Она что-нибудь сказала?"),
 		narr("Адриан долго смотрит на пустую оправу.").show(adrian),
-		adrian.say("Просила не отдавать тебя."),
+		adrianSad.say("Просила не отдавать тебя."),
 		evelynSad.say("Кому?"),
 		adrian.say("Она не успела сказать."),
 		narr("Эвелин обхватывает себя руками.").show(evelynSad),
@@ -1220,7 +1271,7 @@ func sceneEight(g *storyGraph) {
 
 	g.beat("s8.alt_end", bwForesterInterior,
 		narr("За окном над водой вспыхивает синий свет.").hide(),
-		narr("Эвелин замечает, как резко Адриан встаёт.").show(adrian),
+		narr("Эвелин замечает, как резко Адриан встаёт.").show(adrianWorried),
 		evelynWorried.say("Ты сказал, она это остановила."),
 		adrian.say("Остановила."),
 		evelynWorried.say("Тогда что сейчас происходит?"),
@@ -1228,7 +1279,7 @@ func sceneEight(g *storyGraph) {
 		adrian.say("То же, что произошло в ту ночь."),
 		evelynWorried.say("Почему?"),
 		narr("Адриан поворачивается к ней.").show(adrian),
-		adrian.say("Потому что печать не разрушилась сама. Кто-то из моей семьи ей помог."),
+		adrianSad.say("Потому что печать не разрушилась сама. Кто-то из моей семьи ей помог."),
 		thought("Я ещё не знаю, верю ли ему. Но теперь точно знаю, что не уеду.").show(evelyn),
 	)
 	g.link(from("s8.alt_end"), "Затемнение", "s8.end")
