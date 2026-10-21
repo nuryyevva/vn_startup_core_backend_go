@@ -25,7 +25,8 @@ type Story struct {
 }
 
 // SpriteFraming is how close the camera is on the character sprite: the
-// whole figure, or a closer shot cropped just below the knees. It names the
+// whole figure, a closer shot cropped just below the knees, or a close one
+// cropped at the waist (the usual shot of a conversation). It names the
 // shot only; the client decides how much of the image that is. Stored in
 // scenes.sprite_framing (migration 0019) as the shot a scene opens with, and
 // switchable per dialogue_script line ("sprite_framing").
@@ -34,11 +35,12 @@ type SpriteFraming string
 const (
 	SpriteFramingFull  SpriteFraming = "full"
 	SpriteFramingKnees SpriteFraming = "knees"
+	SpriteFramingWaist SpriteFraming = "waist"
 )
 
 // Valid reports whether f is one of the shots scenes.sprite_framing allows.
 func (f SpriteFraming) Valid() bool {
-	return f == SpriteFramingFull || f == SpriteFramingKnees
+	return f == SpriteFramingFull || f == SpriteFramingKnees || f == SpriteFramingWaist
 }
 
 type Scene struct {

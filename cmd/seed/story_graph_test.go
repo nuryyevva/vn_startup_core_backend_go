@@ -90,12 +90,12 @@ func TestStoryGraph_FramingDoesNotLeakBetweenTargets(t *testing.T) {
 
 func TestStoryGraph_RejectsUnknownFraming(t *testing.T) {
 	g := framingGraph()
-	g.beat("only", "street", narr("x").framed("waist"))
+	g.beat("only", "street", narr("x").framed("closeup"))
 	_, _, err := g.build()
 	require.Error(t, err)
 
 	g = framingGraph()
-	g.beat("only", "street").framed("waist")
+	g.beat("only", "street").framed("closeup")
 	_, _, err = g.build()
 	require.Error(t, err)
 }

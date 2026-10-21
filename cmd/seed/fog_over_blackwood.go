@@ -111,24 +111,23 @@ var (
 	adrianInMemory = portrait{"Адриан", ""}
 )
 
-// Sprite framing. The camera follows the place: in cramped rooms — the car,
-// the kitchen table, the cafeteria, the archive, the forester's single room —
-// it sits closer and the sprites are cut just below the knees; outdoors, on
-// the parking lot and in the long corridor it shows the whole figure. On top
-// of that a few moments override the shot (see .framed in the scenes below):
-// someone rising, stepping back or walking past pulls back to the full
-// figure, a face-to-face confrontation in the corridor moves in.
+// Sprite framing. Most of the story is conversation, so the usual shot is the
+// character cropped at the waist (the art is always the full figure; the client
+// crops it). Only the wide establishing places — the house from the street,
+// the forest road, the forester's yard — show the whole figure. On top of that
+// a few moments override the shot (see .framed in the scenes below): someone
+// rising, stepping back or walking past pulls back to the full figure.
 const (
 	bwFull  = domain.SpriteFramingFull
-	bwKnees = domain.SpriteFramingKnees
+	bwWaist = domain.SpriteFramingWaist
 )
 
 func bwFramingFor(backgroundURL string) domain.SpriteFraming {
 	switch backgroundURL {
-	case bwCarInterior, bwKitchen, bwCafeteria, bwArchive, bwForesterInterior:
-		return bwKnees
+	case bwHouseExterior, bwForestRoad, bwForesterExterior:
+		return bwFull
 	}
-	return bwFull
+	return bwWaist
 }
 
 func from(keys ...string) []string { return keys }
@@ -448,7 +447,7 @@ func sceneTwo(g *storyGraph) {
 		adrianAngry.say("Я никогда не был у озера."),
 		narr("Дэмиан, проходящий мимо с подносом, задерживается.").show(damian).framed(bwFull),
 		damianSmile.say("Тогда откуда тебе знать?"),
-		narr("Адриан не отвечает.").show(adrianAngry).framed(bwKnees),
+		narr("Адриан не отвечает.").show(adrianAngry).framed(bwWaist),
 		thought("Кажется, я случайно попала в чужую ссору.").show(evelyn),
 		narr("Вейлы уходят. Люси оборачивается и прощально поднимает руку.").show(lucySmile).framed(bwFull),
 	)
@@ -609,7 +608,7 @@ func sceneFour(g *storyGraph, hasPhoto, noPhoto lineCondition) {
 		evelynAngry.say("Это портит твою версию?"),
 		adrian.say("Ты испугалась. В такие моменты память…"),
 		evelynAngry.say("Осторожнее со следующим словом."),
-	).framed(bwKnees)
+	).framed(bwWaist)
 	g.link(from("s4.talk"), "Предъявить свидетельство", "s4.key",
 		evelynAngry.say("Ты оставил руку в металле.").when(hasPhoto),
 		narr("Эвелин показывает ему снимок.").when(hasPhoto),
@@ -644,7 +643,7 @@ func sceneFour(g *storyGraph, hasPhoto, noPhoto lineCondition) {
 		adrian.say("Отдай Моргану."),
 		evelyn.say("Я не говорила, что собираюсь к нему."),
 		narr("Пауза."),
-	).framed(bwKnees)
+	).framed(bwWaist)
 	g.link(from("s4.key"), "Надавить", "s4.leave",
 		evelynAngry.say("Сколько ещё ты знаешь обо мне?"),
 		adrian.say("Меньше, чем ты думаешь."),
@@ -663,7 +662,7 @@ func sceneFour(g *storyGraph, hasPhoto, noPhoto lineCondition) {
 		thought("Вот это прозвучало честно. Жаль, что именно это.").show(evelynSad),
 		narr("Дверь аудитории открывается. Коридор наполняется студентами.").hide(),
 		narr("Адриан уходит вместе с потоком."),
-	).framed(bwKnees)
+	).framed(bwWaist)
 }
 
 // --- Сцена 5. Чужая подпись ---
@@ -678,7 +677,7 @@ func sceneFive(g *storyGraph) {
 		morganWorried.say("Простите. Вы очень на неё похожи."),
 		evelyn.say("Все говорят."),
 		morgan.say("Она бы рассердилась. Считала, что люди обязаны быть похожи на себя."),
-		narr("Эвелин улыбается.").show(evelynSmile).framed(bwKnees),
+		narr("Эвелин улыбается.").show(evelynSmile).framed(bwWaist),
 		thought("Он действительно её знал."),
 		narr("Она кладёт ключ на стол."),
 		narr("Улыбка Моргана исчезает.").show(morganTired),
@@ -1070,7 +1069,7 @@ func sceneSeven(g *storyGraph) {
 	)
 
 	g.beat("s7.offer", bwForesterInterior,
-		evelyn.say("У моей бабушки ты что-нибудь забрал?").framed(bwKnees),
+		evelyn.say("У моей бабушки ты что-нибудь забрал?").framed(bwWaist),
 		adrian.say("Нет."),
 		evelynAngry.say("Ты уже лгал мне."),
 		adrianSad.say("Да."),
@@ -1170,7 +1169,7 @@ func sceneEight(g *storyGraph) {
 		narr("Адриан сразу отпускает."),
 		narr("Она отступает и ударяется о стол. Лампа падает, катится по полу."),
 		narr("Тот же звук. Та же комната."),
-		narr("Только бабушки больше нет.").show(evelynSad).framed(bwKnees),
+		narr("Только бабушки больше нет.").show(evelynSad).framed(bwWaist),
 		thought("Это случилось здесь. Пока я жила своей жизнью, она была здесь."),
 		narr("Адриан делает движение к ней.").show(adrianWorried),
 		evelynSad.say("Не надо."),

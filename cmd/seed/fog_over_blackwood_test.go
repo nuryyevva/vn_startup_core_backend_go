@@ -147,16 +147,16 @@ func TestFogOverBlackwood_SpriteFraming(t *testing.T) {
 	opening := func(key string) string { return string(byKey[g.sceneID(key).String()].spriteFraming) }
 
 	assert.Equal(t, "full", opening("s1.arrival"), "outdoors: the whole figure")
-	assert.Equal(t, "knees", opening("s2.meet"), "cafeteria table: closer")
-	assert.Equal(t, "full", opening("s4.watch"), "watching Adrian down the corridor")
-	assert.Equal(t, "knees", opening("s4.talk"), "talking face to face in the same corridor")
+	assert.Equal(t, "waist", opening("s2.meet"), "cafeteria table: conversation, cropped at the waist")
+	assert.Equal(t, "waist", opening("s4.watch"), "the corridor: the usual conversation shot")
+	assert.Equal(t, "waist", opening("s4.talk"), "talking face to face in the same corridor")
 	// s6.road opens on the porch (the reaction to the porch choice) and then
 	// cuts to the car.
 	var road []scriptLine
 	require.NoError(t, json.Unmarshal([]byte(byKey[g.sceneID("s6.road").String()].dialogueScript), &road))
 	cut := slices.IndexFunc(road, func(l scriptLine) bool { return l.BackgroundURL == bwCarInterior })
 	require.NotEqual(t, -1, cut)
-	assert.Equal(t, "knees", string(road[cut].SpriteFraming), "inside the car")
+	assert.Equal(t, "waist", string(road[cut].SpriteFraming), "inside the car")
 
 	for _, sc := range s.scenes {
 		var lines []scriptLine
