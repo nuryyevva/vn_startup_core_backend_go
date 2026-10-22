@@ -89,6 +89,13 @@ func (p portrait) say(text string) scriptLine {
 	return scriptLine{Speaker: p.name, Text: text}.show(p)
 }
 
+// voice is a line spoken by someone who isn't on screen — heard, or seen
+// through, as in a memory lived through their eyes. Unlike say, it leaves
+// whatever sprite is shown where it is.
+func (p portrait) voice(text string) scriptLine {
+	return scriptLine{Speaker: p.name, Text: text}
+}
+
 func (l scriptLine) show(p portrait) scriptLine {
 	sprite := p.sprite
 	l.SpriteURL = &sprite
