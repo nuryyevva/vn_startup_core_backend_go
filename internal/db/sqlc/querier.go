@@ -28,8 +28,11 @@ type Querier interface {
 	GetDialogSessionForUpdate(ctx context.Context, id uuid.UUID) (DialogSession, error)
 	GetFirstSceneOfStory(ctx context.Context, storyID uuid.UUID) (Scene, error)
 	GetPlayerProgress(ctx context.Context, arg GetPlayerProgressParams) (PlayerProgress, error)
-	GetScene(ctx context.Context, id uuid.UUID) (Scene, error)
+	// With the story's coming_soon, so a scene of a story that can't be played
+	// yet is refused without another round trip.
+	GetScene(ctx context.Context, id uuid.UUID) (GetSceneRow, error)
 	GetStory(ctx context.Context, id uuid.UUID) (Story, error)
+	// Balance adjustments (migration 0021) are corrections, not spending.
 	GetTotalDiamondsSpent(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
@@ -57,6 +60,7 @@ type Querier interface {
 	// rows wouldn't block a concurrent INSERT anyway, so we serialize
 	// read-balance-then-insert per user with an advisory lock instead.
 	LockWallet(ctx context.Context, userID string) error
+	MakeUserAdmin(ctx context.Context, arg MakeUserAdminParams) error
 	RemoveStoryBookmark(ctx context.Context, arg RemoveStoryBookmarkParams) error
 	UnlockAchievement(ctx context.Context, arg UnlockAchievementParams) (UserAchievement, error)
 	UpdatePlayerProgress(ctx context.Context, arg UpdatePlayerProgressParams) (PlayerProgress, error)

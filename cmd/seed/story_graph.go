@@ -187,7 +187,6 @@ type graphBeat struct {
 type talkTo struct {
 	characterID uuid.UUID
 	sprite      string // shown whenever no line has chosen a sprite yet
-	messages    int32  // free-dialog message limit; zero or less means no limit
 }
 
 type graphLink struct {
@@ -216,8 +215,11 @@ func (g *storyGraph) beat(key, bg string, lines ...scriptLine) *graphBeat {
 // talksWith lets the player start a free dialog with the character in this
 // beat. Pick beats where the character is on screen and the player can
 // linger (hubs): the "talk" button sits next to the beat's choices.
-func (b *graphBeat) talksWith(characterID uuid.UUID, sprite string, messages int32) *graphBeat {
-	b.talk = &talkTo{characterID: characterID, sprite: sprite, messages: messages}
+//
+// Conversations have no length limit: each message the player sends costs
+// diamonds (dialog.MessageCost), and that is what paces them.
+func (b *graphBeat) talksWith(characterID uuid.UUID, sprite string) *graphBeat {
+	b.talk = &talkTo{characterID: characterID, sprite: sprite}
 	return b
 }
 
@@ -378,12 +380,7 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 				sc.characterSpriteURL = strPtr(t.sprite)
 			}
 			sc.freeDialogEnabled = true
-			if t.messages > 0 {
-				sc.dialogLimitType = strPtr("messages")
-				sc.dialogLimitValue = i32Ptr(t.messages)
-			} else {
-				sc.dialogLimitType = strPtr("none")
-			}
+			sc.dialogLimitType = strPtr("none")
 		}
 		scenes = append(scenes, sc)
 	}

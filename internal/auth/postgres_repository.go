@@ -90,6 +90,13 @@ func (r *PostgresRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUI
 	return nil
 }
 
+func (r *PostgresRepository) MakeAdmin(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	if err := r.queries.MakeUserAdmin(ctx, sqlc.MakeUserAdminParams{ID: id, PasswordHash: passwordHash}); err != nil {
+		return fmt.Errorf("make user admin: %w", err)
+	}
+	return nil
+}
+
 func toDomainUser(u sqlc.User) User {
 	return User{
 		ID:           u.ID,

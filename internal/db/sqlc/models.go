@@ -87,6 +87,7 @@ type Story struct {
 	Genre       string      `json:"genre"`
 	Status      string      `json:"status"`
 	PlayerTheme []byte      `json:"player_theme"`
+	ComingSoon  bool        `json:"coming_soon"`
 }
 
 type StoryBookmark struct {

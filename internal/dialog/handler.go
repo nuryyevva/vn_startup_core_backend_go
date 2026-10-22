@@ -42,7 +42,7 @@ func (h *Handler) startSession(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(toSessionResponse(session))
+	return c.Status(fiber.StatusCreated).JSON(toSessionResponse(session, h.service.MessageCost()))
 }
 
 func (h *Handler) sendMessage(c *fiber.Ctx) error {
@@ -88,5 +88,5 @@ func (h *Handler) endSession(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(toSessionResponse(session))
+	return c.JSON(toSessionResponse(session, h.service.MessageCost()))
 }

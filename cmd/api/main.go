@@ -83,7 +83,7 @@ func run() error {
 	// --- services (wired in dependency order) ---
 	userService := user.NewService(userRepo)
 	walletService := wallet.NewService(walletRepo)
-	authService := auth.NewService(authRepo, tokenIssuer).WithSignupBonus(walletService, int32(cfg.Dialog.SignupBonus))
+	authService := auth.NewService(authRepo, tokenIssuer).WithSignupBonus(walletService, wallet.StartingBalance)
 	storyService := story.NewService(storyRepo, walletService, publisher, log)
 	dialogService := dialog.NewService(
 		dialogRepo,
@@ -91,7 +91,7 @@ func run() error {
 		walletService,
 		publisher,
 		hub,
-		int32(cfg.Dialog.DefaultMessageCost),
+		dialog.MessageCost,
 		log,
 	)
 	statsService := stats.NewService(statsRepo)
@@ -102,11 +102,21 @@ func run() error {
 		stats:  statsService,
 	})
 
+	admins, err := auth.ParseAdminAccounts(cfg.Admin.Accounts)
+	if err != nil {
+		return fmt.Errorf("ADMIN_ACCOUNTS: %w", err)
+	}
+	if err := authService.EnsureAdmins(context.Background(), admins); err != nil {
+		return fmt.Errorf("ensure admin accounts: %w", err)
+	}
+	log.Info("admin accounts ensured", "count", len(admins))
+
 	// --- handlers ---
 	authHandler := auth.NewHandler(authService)
 	userHandler := user.NewHandler(userService)
 	storyHandler := story.NewHandler(storyService)
 	walletHandler := wallet.NewHandler(walletService)
+	topUpHandler := wallet.NewTopUpHandler(walletService)
 	dialogHandler := dialog.NewHandler(dialogService)
 	realtimeHandler := realtime.NewHandler(hub, log)
 	statsHandler := stats.NewHandler(statsService)
@@ -135,15 +145,10 @@ func run() error {
 	userHandler.RegisterRoutes(app, authMiddleware)
 	storyHandler.RegisterRoutes(app, authMiddleware)
 	walletHandler.RegisterRoutes(app, authMiddleware)
+	topUpHandler.RegisterRoutes(app, authMiddleware)
 	dialogHandler.RegisterRoutes(app, authMiddleware)
 	statsHandler.RegisterRoutes(app, authMiddleware)
 	achievementHandler.RegisterRoutes(app, authMiddleware)
-
-	if cfg.Dev.EnableDevEndpoints {
-		devWalletHandler := wallet.NewDevHandler(walletService)
-		devWalletHandler.RegisterRoutes(app, authMiddleware)
-		log.Warn("dev endpoints enabled: /dev/wallet/grant is exposed")
-	}
 
 	realtimeHandler.RegisterRoutes(app, authMiddleware)
 

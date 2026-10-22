@@ -105,7 +105,9 @@ func (r *PostgresRepository) GetScene(ctx context.Context, id uuid.UUID) (Scene,
 		}
 		return Scene{}, fmt.Errorf("get scene: %w", err)
 	}
-	return toDomainScene(row), nil
+	scene := toDomainScene(row.Scene)
+	scene.StoryComingSoon = row.StoryComingSoon
+	return scene, nil
 }
 
 func (r *PostgresRepository) ListProgressByUser(ctx context.Context, userID uuid.UUID) ([]ProgressSummary, error) {
@@ -128,6 +130,7 @@ func (r *PostgresRepository) ListProgressByUser(ctx context.Context, userID uuid
 				Genre:       row.StoryGenre,
 				Status:      row.StoryStatus,
 				CreatedAt:   row.StoryCreatedAt,
+				ComingSoon:  row.StoryComingSoon,
 			},
 			CurrentSceneID:    row.CurrentSceneID,
 			ChoicesMade:       choicesMade,
@@ -284,6 +287,7 @@ func toDomainStory(s sqlc.Story) Story {
 		IsPublished: s.IsPublished,
 		CreatedAt:   s.CreatedAt,
 		PlayerTheme: json.RawMessage(s.PlayerTheme),
+		ComingSoon:  s.ComingSoon,
 	}
 }
 

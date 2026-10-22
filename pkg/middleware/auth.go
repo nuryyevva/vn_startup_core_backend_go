@@ -43,6 +43,13 @@ func Auth(issuer *auth.TokenIssuer) fiber.Handler {
 	}
 }
 
+// RoleFromContext reads the authenticated user's role set by Auth ("" on a
+// route not protected by Auth).
+func RoleFromContext(c *fiber.Ctx) string {
+	role, _ := c.Locals(LocalsRole).(string)
+	return role
+}
+
 // UserIDFromContext reads the authenticated user's ID set by Auth. It
 // returns an apperr.Error if called on a route not protected by Auth.
 func UserIDFromContext(c *fiber.Ctx) (uuid.UUID, error) {

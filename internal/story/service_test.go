@@ -3,6 +3,7 @@ package story
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/google/uuid"
@@ -154,6 +155,7 @@ func TestService_GetOrCreateProgress_ReturnsExisting(t *testing.T) {
 
 	userID, storyID := uuid.New(), uuid.New()
 	existing := Progress{UserID: userID, StoryID: storyID, CurrentSceneID: uuid.New()}
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID, IsPublished: true}, nil)
 	repo.On("GetProgress", mock.Anything, userID, storyID).Return(existing, nil)
 
 	progress, err := svc.GetOrCreateProgress(context.Background(), userID, storyID)
@@ -531,6 +533,7 @@ func TestService_RestartStory_ResetsProgressAndAnnouncesIt(t *testing.T) {
 	existing := Progress{UserID: userID, StoryID: storyID, CurrentSceneID: laterSceneID, ChoicesMade: []uuid.UUID{uuid.New()}}
 	restarted := Progress{UserID: userID, StoryID: storyID, CurrentSceneID: firstSceneID, ChoicesMade: []uuid.UUID{}}
 
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID, IsPublished: true}, nil)
 	repo.On("GetProgress", mock.Anything, userID, storyID).Return(existing, nil)
 	repo.On("GetFirstScene", mock.Anything, storyID).Return(Scene{ID: firstSceneID, StoryID: storyID}, nil)
 	repo.On("UpdateProgress", mock.Anything, userID, storyID, firstSceneID, []uuid.UUID{}).Return(restarted, nil)
@@ -571,6 +574,7 @@ func TestService_RestartStory_FromChapterKeepsEarlierChoicesAndAnnouncesTheOrder
 	restarted := Progress{UserID: userID, StoryID: storyID, CurrentSceneID: chapterSceneID, ChoicesMade: []uuid.UUID{earlierChoice}}
 	order := int32(7)
 
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID, IsPublished: true}, nil)
 	repo.On("GetProgress", mock.Anything, userID, storyID).Return(existing, nil)
 	repo.On("GetScene", mock.Anything, chapterSceneID).Return(chapterScene, nil)
 	repo.On("ListChoiceIDsFromEarlierScenes", mock.Anything, chapterScene, existing.ChoicesMade).
@@ -591,6 +595,7 @@ func TestService_RestartStory_RejectsASceneFromAnotherStory(t *testing.T) {
 	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
 
 	userID, storyID, foreignSceneID := uuid.New(), uuid.New(), uuid.New()
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID, IsPublished: true}, nil)
 	repo.On("GetProgress", mock.Anything, userID, storyID).Return(Progress{UserID: userID, StoryID: storyID}, nil)
 	repo.On("GetScene", mock.Anything, foreignSceneID).Return(Scene{ID: foreignSceneID, StoryID: uuid.New()}, nil)
 
@@ -598,4 +603,37 @@ func TestService_RestartStory_RejectsASceneFromAnotherStory(t *testing.T) {
 
 	require.Error(t, err)
 	repo.AssertNotCalled(t, "UpdateProgress", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func assertComingSoon(t *testing.T, err error) {
+	t.Helper()
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, http.StatusForbidden, appErr.Status)
+	assert.Equal(t, "story_coming_soon", appErr.Code)
+}
+
+func TestService_ComingSoonStoryCantBePlayed(t *testing.T) {
+	repo := new(mockRepository)
+	svc := NewService(repo, new(mockWallet), new(mockPublisher), nil)
+
+	userID, storyID, sceneID := uuid.New(), uuid.New(), uuid.New()
+	repo.On("GetStory", mock.Anything, storyID).Return(Story{ID: storyID, IsPublished: true, ComingSoon: true}, nil)
+	repo.On("GetScene", mock.Anything, sceneID).Return(Scene{ID: sceneID, StoryID: storyID, StoryComingSoon: true}, nil)
+
+	_, err := svc.GetOrCreateProgress(context.Background(), userID, storyID)
+	assertComingSoon(t, err)
+	_, _, err = svc.ListStoryScenes(context.Background(), userID, storyID)
+	assertComingSoon(t, err)
+	_, _, err = svc.GetSceneForPlayer(context.Background(), userID, sceneID)
+	assertComingSoon(t, err)
+	_, _, err = svc.GetScene(context.Background(), sceneID)
+	assertComingSoon(t, err)
+	_, err = svc.SubmitChoice(context.Background(), userID, sceneID, uuid.New())
+	assertComingSoon(t, err)
+	assertComingSoon(t, svc.UnlockScene(context.Background(), userID, sceneID))
+
+	// Nothing about the player was read or written.
+	repo.AssertNotCalled(t, "GetProgress", mock.Anything, mock.Anything, mock.Anything)
+	repo.AssertNotCalled(t, "CreateProgress", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

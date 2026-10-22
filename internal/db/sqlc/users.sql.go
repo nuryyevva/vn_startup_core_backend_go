@@ -69,6 +69,20 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const makeUserAdmin = `-- name: MakeUserAdmin :exec
+UPDATE users SET role = 'admin', password_hash = $2 WHERE id = $1
+`
+
+type MakeUserAdminParams struct {
+	ID           uuid.UUID `json:"id"`
+	PasswordHash string    `json:"password_hash"`
+}
+
+func (q *Queries) MakeUserAdmin(ctx context.Context, arg MakeUserAdminParams) error {
+	_, err := q.db.Exec(ctx, makeUserAdmin, arg.ID, arg.PasswordHash)
+	return err
+}
+
 const updateUserPasswordHash = `-- name: UpdateUserPasswordHash :exec
 UPDATE users SET password_hash = $2 WHERE id = $1
 `

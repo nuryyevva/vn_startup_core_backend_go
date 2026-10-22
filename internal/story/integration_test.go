@@ -151,6 +151,37 @@ func TestStoryIntegration_SceneSpriteFraming(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, story.SpriteFramingKnees, sc.SpriteFraming)
 
-	_, err = pool.Exec(ctx, `UPDATE scenes SET sprite_framing = 'waist' WHERE id = $1`, closeUpID)
+	_, err = pool.Exec(ctx, `UPDATE scenes SET sprite_framing = 'closeup' WHERE id = $1`, closeUpID)
 	assert.Error(t, err, "only the shots the client knows are allowed")
+}
+
+func TestStoryIntegration_ComingSoonStoryIsListedButNotPlayable(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in -short mode")
+	}
+
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+
+	authRepo := auth.NewPostgresRepository(pool)
+	player, err := authRepo.CreateUser(ctx, "soon-player@example.com", "hash")
+	require.NoError(t, err)
+
+	storyID, sceneID := uuid.New(), uuid.New()
+	_, err = pool.Exec(ctx, `INSERT INTO stories (id, title, is_published, coming_soon) VALUES ($1, 'Soon', true, true)`, storyID)
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `INSERT INTO scenes (id, story_id, order_index, dialogue_script) VALUES ($1,$2,0,'[]')`, sceneID, storyID)
+	require.NoError(t, err)
+
+	svc := story.NewService(story.NewPostgresRepository(pool), stubWallet{}, stubPublisher{}, nil)
+
+	page, err := svc.ListPublishedStories(ctx, nil, 1, 20)
+	require.NoError(t, err)
+	require.Len(t, page.Stories, 1)
+	assert.True(t, page.Stories[0].ComingSoon, "listed, marked as coming soon")
+
+	_, _, err = svc.GetSceneForPlayer(ctx, player.ID, sceneID)
+	assert.ErrorContains(t, err, "скоро")
+	_, err = svc.GetOrCreateProgress(ctx, player.ID, storyID)
+	assert.ErrorContains(t, err, "скоро")
 }

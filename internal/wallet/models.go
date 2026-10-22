@@ -19,6 +19,10 @@ const (
 	ReasonChoicePurchase = "choice_purchase"
 	ReasonDialogMessage  = "dialog_message"
 	ReasonSignupBonus    = "signup_bonus"
+	// ReasonBalanceAdjustment brought every account that existed before the
+	// starting-balance rule to StartingBalance (migration 0021). It's a
+	// correction, not spending, so it never counts toward "diamonds spent".
+	ReasonBalanceAdjustment = "balance_adjustment"
 )
 
 type BalanceResponse struct {

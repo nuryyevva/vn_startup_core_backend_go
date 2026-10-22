@@ -11,3 +11,6 @@ SELECT * FROM users WHERE id = $1;
 
 -- name: UpdateUserPasswordHash :exec
 UPDATE users SET password_hash = $2 WHERE id = $1;
+
+-- name: MakeUserAdmin :exec
+UPDATE users SET role = 'admin', password_hash = $2 WHERE id = $1;

@@ -69,6 +69,7 @@ SELECT
     s.genre AS story_genre,
     s.status AS story_status,
     s.created_at AS story_created_at,
+    s.coming_soon AS story_coming_soon,
     pp.current_scene_id,
     pp.choices_made,
     pp.updated_at,
@@ -89,6 +90,7 @@ type ListPlayerProgressByUserRow struct {
 	StoryGenre        string      `json:"story_genre"`
 	StoryStatus       string      `json:"story_status"`
 	StoryCreatedAt    time.Time   `json:"story_created_at"`
+	StoryComingSoon   bool        `json:"story_coming_soon"`
 	CurrentSceneID    uuid.UUID   `json:"current_scene_id"`
 	ChoicesMade       []byte      `json:"choices_made"`
 	UpdatedAt         time.Time   `json:"updated_at"`
@@ -113,6 +115,7 @@ func (q *Queries) ListPlayerProgressByUser(ctx context.Context, userID uuid.UUID
 			&i.StoryGenre,
 			&i.StoryStatus,
 			&i.StoryCreatedAt,
+			&i.StoryComingSoon,
 			&i.CurrentSceneID,
 			&i.ChoicesMade,
 			&i.UpdatedAt,

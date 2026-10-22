@@ -43,6 +43,7 @@ type exportedStory struct {
 	Status      string          `json:"status"`
 	CreatedAt   time.Time       `json:"created_at"`
 	PlayerTheme json.RawMessage `json:"player_theme,omitempty"`
+	ComingSoon  bool            `json:"coming_soon"`
 	Scenes      []exportedScene `json:"scenes"`
 }
 
@@ -122,6 +123,7 @@ func (e exporter) story(ctx context.Context, s story) (exportedStory, error) {
 		CoverURL:    cover,
 		Genre:       s.genre,
 		Status:      s.status,
+		ComingSoon:  s.comingSoon,
 	}
 	if s.playerTheme != "" {
 		out.PlayerTheme = json.RawMessage(s.playerTheme)

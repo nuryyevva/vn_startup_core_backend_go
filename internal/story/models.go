@@ -22,6 +22,9 @@ type Story struct {
 	// look. The backend stores and returns it verbatim — the token
 	// vocabulary belongs to the client (see README "Тема плеера").
 	PlayerTheme json.RawMessage
+	// ComingSoon lists the story without letting anyone play it yet
+	// (migration 0022): its scenes and progress are refused.
+	ComingSoon bool
 }
 
 // SpriteFraming is how close the camera is on the character sprite: the
@@ -64,6 +67,9 @@ type Scene struct {
 	// these instead of every scene (migrations 0015, 0016).
 	ChapterTitle *string
 	Title        *string
+	// StoryComingSoon is the scene's story's ComingSoon, read along with
+	// the scene.
+	StoryComingSoon bool
 }
 
 type Choice struct {
@@ -103,6 +109,8 @@ type StoryResponse struct {
 	// omitempty drops a nil RawMessage, so unthemed stories don't carry
 	// a "player_theme": null.
 	PlayerTheme json.RawMessage `json:"player_theme,omitempty"`
+	// ComingSoon: shown in the catalog, not playable yet.
+	ComingSoon bool `json:"coming_soon"`
 }
 
 func toStoryResponse(s Story) StoryResponse {
@@ -115,6 +123,7 @@ func toStoryResponse(s Story) StoryResponse {
 		Status:      s.Status,
 		CreatedAt:   s.CreatedAt,
 		PlayerTheme: s.PlayerTheme,
+		ComingSoon:  s.ComingSoon,
 	}
 }
 

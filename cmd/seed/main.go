@@ -103,6 +103,7 @@ type story struct {
 	// playerTheme is the stories.player_theme JSON object ("" = default
 	// look), e.g. `{"preset":"mist"}` — see README "Тема плеера".
 	playerTheme string
+	comingSoon  bool // listed but not playable yet (stories.coming_soon)
 	scenes      []scene
 	choices     []choice
 }
@@ -166,12 +167,13 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO stories (id, title, description, cover_url, genre, status, player_theme, is_published)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+		`INSERT INTO stories (id, title, description, cover_url, genre, status, player_theme, coming_soon, is_published)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
 		 ON CONFLICT (id) DO UPDATE SET
 		     title = EXCLUDED.title, description = EXCLUDED.description, cover_url = EXCLUDED.cover_url,
-		     genre = EXCLUDED.genre, status = EXCLUDED.status, player_theme = EXCLUDED.player_theme`,
-		s.id, s.title, s.description, s.coverURL, s.genre, s.status, playerTheme,
+		     genre = EXCLUDED.genre, status = EXCLUDED.status, player_theme = EXCLUDED.player_theme,
+		     coming_soon = EXCLUDED.coming_soon`,
+		s.id, s.title, s.description, s.coverURL, s.genre, s.status, playerTheme, s.comingSoon,
 	); err != nil {
 		return fmt.Errorf("insert story: %w", err)
 	}
@@ -352,6 +354,7 @@ func redRidingHoodStory() story {
 		genre:       "fantasy",
 		status:      "completed",
 		playerTheme: `{"preset":"storybook"}`,
+		comingSoon:  true,
 		scenes: []scene{
 			{
 				id:                 redRidingHoodScene1ID,
@@ -370,8 +373,6 @@ func redRidingHoodStory() story {
 				backgroundMusicURL: strPtr(ridingHoodBackgroundMusic),
 				dialogueScript:     `[{"speaker":"narrator","text":"На тропинке девочку встретил Волк. Он был не прочь узнать, куда она идёт."},{"speaker":"Волк","text":"Куда путь держишь, дитя, в такой ранний час?"}]`,
 				freeDialogEnabled:  true,
-				dialogLimitType:    strPtr("messages"),
-				dialogLimitValue:   i32Ptr(5),
 			},
 			{
 				id:                 redRidingHoodScene3ID,
@@ -423,6 +424,7 @@ func aliceStory() story {
 		// A preset plus one overridden token: gold accents on the
 		// wonderland palette.
 		playerTheme: `{"preset":"wonderland","accent_color":"#E8C36A"}`,
+		comingSoon:  true,
 		scenes: []scene{
 			{
 				id:                 aliceScene1ID,
@@ -441,8 +443,6 @@ func aliceStory() story {
 				backgroundMusicURL: strPtr(aliceBackgroundMusic),
 				dialogueScript:     `[{"speaker":"narrator","text":"Алиса нырнула вслед за Кроликом в нору, даже не подумав, как же она будет выбираться обратно."},{"speaker":"narrator","text":"Нора шла прямо, как туннель, а потом внезапно обрывалась вниз — и падение оказалось на удивление медленным."}]`,
 				freeDialogEnabled:  true,
-				dialogLimitType:    strPtr("time"),
-				dialogLimitValue:   i32Ptr(120),
 			},
 			{
 				id:                 aliceScene3ID,

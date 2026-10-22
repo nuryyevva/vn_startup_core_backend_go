@@ -1,32 +1,37 @@
 package wallet
 
 import (
+	"net/http"
+
 	"github.com/gofiber/fiber/v2"
 
 	"vn_startup_core_backend_go/pkg/apperr"
 	"vn_startup_core_backend_go/pkg/middleware"
 )
 
-// DevHandler exposes the manual diamond-grant endpoint that stands in for a
-// real payment provider on this stage of the project. RegisterRoutes must
-// only be called when Config.Dev.EnableDevEndpoints is true; when disabled
-// the route is simply never registered, so it 404s.
-type DevHandler struct {
+// TopUpHandler exposes the manual diamond top-up that stands in for a real
+// payment provider at this stage of the project. Only admins may use it;
+// for everyone else buying diamonds is "coming soon", and the endpoint says
+// exactly that (403 top_up_unavailable), which the client shows as is.
+type TopUpHandler struct {
 	service *Service
 }
 
-func NewDevHandler(service *Service) *DevHandler {
-	return &DevHandler{service: service}
+func NewTopUpHandler(service *Service) *TopUpHandler {
+	return &TopUpHandler{service: service}
 }
 
-func (h *DevHandler) RegisterRoutes(router fiber.Router, auth fiber.Handler) {
+func (h *TopUpHandler) RegisterRoutes(router fiber.Router, auth fiber.Handler) {
 	router.Post("/dev/wallet/grant", auth, h.grant)
 }
 
-func (h *DevHandler) grant(c *fiber.Ctx) error {
+func (h *TopUpHandler) grant(c *fiber.Ctx) error {
 	userID, err := middleware.UserIDFromContext(c)
 	if err != nil {
 		return err
+	}
+	if middleware.RoleFromContext(c) != RoleAdmin {
+		return apperr.New(http.StatusForbidden, "top_up_unavailable", "Пополнение скоро будет доступно")
 	}
 
 	var req GrantRequest
@@ -41,3 +46,6 @@ func (h *DevHandler) grant(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusCreated).JSON(toTransactionResponse(tx))
 }
+
+// RoleAdmin is the users.role value allowed to top wallets up.
+const RoleAdmin = "admin"

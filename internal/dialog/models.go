@@ -55,25 +55,33 @@ type SendMessageRequest struct {
 	Text string `json:"text"`
 }
 
+// MessageCost is the price in diamonds of each message the player sends in
+// a free dialog. Conversations have no length limit; this is what paces them.
+const MessageCost int32 = 10
+
 type SessionResponse struct {
-	ID           uuid.UUID  `json:"id"`
-	CharacterID  uuid.UUID  `json:"character_id"`
-	SceneID      uuid.UUID  `json:"scene_id"`
-	Status       string     `json:"status"`
-	LimitType    string     `json:"limit_type"`
-	LimitValue   *int32     `json:"limit_value,omitempty"`
-	MessageCount int32      `json:"message_count"`
-	StartedAt    time.Time  `json:"started_at"`
-	EndedAt      *time.Time `json:"ended_at,omitempty"`
-	EndReason    *string    `json:"end_reason,omitempty"`
+	ID           uuid.UUID `json:"id"`
+	CharacterID  uuid.UUID `json:"character_id"`
+	SceneID      uuid.UUID `json:"scene_id"`
+	Status       string    `json:"status"`
+	LimitType    string    `json:"limit_type"`
+	LimitValue   *int32    `json:"limit_value,omitempty"`
+	MessageCount int32     `json:"message_count"`
+	// MessageCost is the price of the next message, so the client can show
+	// it before the player sends.
+	MessageCost int32      `json:"message_cost"`
+	StartedAt   time.Time  `json:"started_at"`
+	EndedAt     *time.Time `json:"ended_at,omitempty"`
+	EndReason   *string    `json:"end_reason,omitempty"`
 }
 
-func toSessionResponse(s Session) SessionResponse {
+func toSessionResponse(s Session, messageCost int32) SessionResponse {
 	return SessionResponse{
 		ID:           s.ID,
 		CharacterID:  s.CharacterID,
 		SceneID:      s.SceneID,
 		Status:       s.Status,
+		MessageCost:  messageCost,
 		LimitType:    s.LimitType,
 		LimitValue:   s.LimitValue,
 		MessageCount: s.MessageCount,

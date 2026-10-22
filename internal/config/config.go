@@ -21,7 +21,7 @@ type Config struct {
 	NATS     NATSConfig
 	JWT      JWTConfig
 	Dialog   DialogConfig
-	Dev      DevConfig
+	Admin    AdminConfig
 	CORS     CORSConfig
 	Media    MediaConfig
 }
@@ -73,14 +73,16 @@ type JWTConfig struct {
 // DialogConfig controls free-dialog session defaults.
 type DialogConfig struct {
 	SessionCheckInterval time.Duration `env:"DIALOG_SESSION_CHECK_INTERVAL" envDefault:"10s"`
-	DefaultMessageCost   int           `env:"DIALOG_DEFAULT_MESSAGE_COST" envDefault:"20"`
-	SignupBonus          int           `env:"SIGNUP_BONUS_DIAMONDS" envDefault:"1000"`
 }
 
-// DevConfig controls development-only conveniences that must never be
-// enabled in production.
-type DevConfig struct {
-	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"` // включает /dev/wallet/grant
+// AdminConfig names the admin accounts. They live only in the server's
+// environment, never in the repository: ADMIN_ACCOUNTS is a comma-separated
+// list of email:hash pairs, the hash being a password hash from
+// `go run ./cmd/hashpassword` (base64, so .env and make leave it alone). On
+// start the API makes sure each of them exists, has that password and the
+// admin role (see auth.Service.EnsureAdmins).
+type AdminConfig struct {
+	Accounts string `env:"ADMIN_ACCOUNTS"`
 }
 
 // CORSConfig controls which browser origins may call the API directly (the
@@ -141,10 +143,6 @@ func (c *Config) validate() error {
 
 	if c.Postgres.MaxConns <= 0 {
 		return fmt.Errorf("POSTGRES_MAX_CONNS must be positive, got %d", c.Postgres.MaxConns)
-	}
-
-	if c.Dialog.DefaultMessageCost < 0 {
-		return fmt.Errorf("DIALOG_DEFAULT_MESSAGE_COST must not be negative, got %d", c.Dialog.DefaultMessageCost)
 	}
 
 	return nil

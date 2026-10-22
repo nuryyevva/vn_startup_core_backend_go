@@ -1,5 +1,10 @@
 -- name: GetScene :one
-SELECT * FROM scenes WHERE id = $1;
+-- With the story's coming_soon, so a scene of a story that can't be played
+-- yet is refused without another round trip.
+SELECT sqlc.embed(scenes), stories.coming_soon AS story_coming_soon
+FROM scenes
+JOIN stories ON stories.id = scenes.story_id
+WHERE scenes.id = $1;
 
 -- name: ListScenesByStory :many
 SELECT * FROM scenes WHERE story_id = $1 ORDER BY order_index ASC;

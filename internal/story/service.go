@@ -140,21 +140,31 @@ func (s *Service) CountUnlockedScenes(ctx context.Context, userID uuid.UUID) (in
 	return int32(len(unlocked)), nil
 }
 
+// errComingSoon refuses anything that would play a story that is only
+// listed for now (Story.ComingSoon).
+func errComingSoon() error {
+	return apperr.New(http.StatusForbidden, "story_coming_soon", "Эта история скоро будет доступна")
+}
+
 // GetOrCreateProgress returns the caller's progress on story, creating a
 // fresh progress row pointed at the story's first scene if none exists yet.
 func (s *Service) GetOrCreateProgress(ctx context.Context, userID, storyID uuid.UUID) (Progress, error) {
+	story, err := s.repo.GetStory(ctx, storyID)
+	if err != nil {
+		if errors.Is(err, ErrStoryNotFound) {
+			return Progress{}, apperr.NotFound("story_not_found", "История не найдена")
+		}
+		return Progress{}, err
+	}
+	if story.ComingSoon {
+		return Progress{}, errComingSoon()
+	}
+
 	progress, err := s.repo.GetProgress(ctx, userID, storyID)
 	if err == nil {
 		return progress, nil
 	}
 	if !errors.Is(err, ErrProgressNotFound) {
-		return Progress{}, err
-	}
-
-	if _, err := s.repo.GetStory(ctx, storyID); err != nil {
-		if errors.Is(err, ErrStoryNotFound) {
-			return Progress{}, apperr.NotFound("story_not_found", "История не найдена")
-		}
 		return Progress{}, err
 	}
 
@@ -237,6 +247,7 @@ func (s *Service) restartTarget(ctx context.Context, storyID uuid.UUID, fromScen
 	}
 	return scene, nil
 }
+
 // ListMyProgress returns every story userID has made progress on, most
 // recently updated first — the data source for the stories screen's
 // "Continue Reading" section and the profile screen's "My Library" /
@@ -254,6 +265,9 @@ func (s *Service) GetScene(ctx context.Context, sceneID uuid.UUID) (Scene, []Cho
 			return Scene{}, nil, apperr.NotFound("scene_not_found", "Сцена не найдена")
 		}
 		return Scene{}, nil, err
+	}
+	if scene.StoryComingSoon {
+		return Scene{}, nil, errComingSoon()
 	}
 
 	choices, err := s.repo.ListChoices(ctx, sceneID)
@@ -275,6 +289,9 @@ func (s *Service) GetSceneForPlayer(ctx context.Context, userID, sceneID uuid.UU
 			return Scene{}, nil, apperr.NotFound("scene_not_found", "Сцена не найдена")
 		}
 		return Scene{}, nil, err
+	}
+	if scene.StoryComingSoon {
+		return Scene{}, nil, errComingSoon()
 	}
 
 	if scene.UnlockCostDiamonds != nil {
@@ -303,11 +320,15 @@ func (s *Service) GetSceneForPlayer(ctx context.Context, userID, sceneID uuid.UU
 // ListStoryScenes returns every scene of storyID with a per-user lock flag,
 // used to render the chapter list on the story detail screen.
 func (s *Service) ListStoryScenes(ctx context.Context, userID, storyID uuid.UUID) ([]Scene, map[uuid.UUID]bool, error) {
-	if _, err := s.repo.GetStory(ctx, storyID); err != nil {
+	story, err := s.repo.GetStory(ctx, storyID)
+	if err != nil {
 		if errors.Is(err, ErrStoryNotFound) {
 			return nil, nil, apperr.NotFound("story_not_found", "История не найдена")
 		}
 		return nil, nil, err
+	}
+	if story.ComingSoon {
+		return nil, nil, errComingSoon()
 	}
 
 	scenes, err := s.repo.ListScenesByStory(ctx, storyID)
@@ -335,6 +356,9 @@ func (s *Service) UnlockScene(ctx context.Context, userID, sceneID uuid.UUID) er
 			return apperr.NotFound("scene_not_found", "Сцена не найдена")
 		}
 		return err
+	}
+	if scene.StoryComingSoon {
+		return errComingSoon()
 	}
 
 	if scene.UnlockCostDiamonds == nil {
@@ -370,6 +394,9 @@ func (s *Service) SubmitChoice(ctx context.Context, userID, sceneID, choiceID uu
 			return Progress{}, apperr.NotFound("scene_not_found", "Сцена не найдена")
 		}
 		return Progress{}, err
+	}
+	if scene.StoryComingSoon {
+		return Progress{}, errComingSoon()
 	}
 
 	choice, err := s.repo.GetChoice(ctx, choiceID)

@@ -69,7 +69,7 @@ func (q *Queries) GetFirstSceneOfStory(ctx context.Context, storyID uuid.UUID) (
 }
 
 const getStory = `-- name: GetStory :one
-SELECT id, title, description, cover_url, is_published, created_at, genre, status, player_theme FROM stories WHERE id = $1
+SELECT id, title, description, cover_url, is_published, created_at, genre, status, player_theme, coming_soon FROM stories WHERE id = $1
 `
 
 func (q *Queries) GetStory(ctx context.Context, id uuid.UUID) (Story, error) {
@@ -85,12 +85,13 @@ func (q *Queries) GetStory(ctx context.Context, id uuid.UUID) (Story, error) {
 		&i.Genre,
 		&i.Status,
 		&i.PlayerTheme,
+		&i.ComingSoon,
 	)
 	return i, err
 }
 
 const listBookmarkedStories = `-- name: ListBookmarkedStories :many
-SELECT s.id, s.title, s.description, s.cover_url, s.is_published, s.created_at, s.genre, s.status, s.player_theme FROM story_bookmarks b
+SELECT s.id, s.title, s.description, s.cover_url, s.is_published, s.created_at, s.genre, s.status, s.player_theme, s.coming_soon FROM story_bookmarks b
 JOIN stories s ON s.id = b.story_id
 WHERE b.user_id = $1
 ORDER BY b.created_at DESC
@@ -115,6 +116,7 @@ func (q *Queries) ListBookmarkedStories(ctx context.Context, userID uuid.UUID) (
 			&i.Genre,
 			&i.Status,
 			&i.PlayerTheme,
+			&i.ComingSoon,
 		); err != nil {
 			return nil, err
 		}
@@ -127,7 +129,7 @@ func (q *Queries) ListBookmarkedStories(ctx context.Context, userID uuid.UUID) (
 }
 
 const listPublishedStoriesPage = `-- name: ListPublishedStoriesPage :many
-SELECT id, title, description, cover_url, is_published, created_at, genre, status, player_theme FROM stories
+SELECT id, title, description, cover_url, is_published, created_at, genre, status, player_theme, coming_soon FROM stories
 WHERE is_published = true
   AND ($1::text IS NULL OR genre = $1)
 ORDER BY created_at DESC
@@ -159,6 +161,7 @@ func (q *Queries) ListPublishedStoriesPage(ctx context.Context, arg ListPublishe
 			&i.Genre,
 			&i.Status,
 			&i.PlayerTheme,
+			&i.ComingSoon,
 		); err != nil {
 			return nil, err
 		}

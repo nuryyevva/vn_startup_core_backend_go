@@ -10,6 +10,11 @@ import (
 	"vn_startup_core_backend_go/pkg/apperr"
 )
 
+// StartingBalance is what every account gets on registration — and, for
+// now, all an account gets: diamonds can't be bought yet, only an admin can
+// top a wallet up.
+const StartingBalance int32 = 600
+
 type Service struct {
 	repo Repository
 }
@@ -29,7 +34,7 @@ func (s *Service) TotalSpent(ctx context.Context, userID uuid.UUID) (int64, erro
 }
 
 // Grant credits amount diamonds to userID. It is only ever called from the
-// dev-only /dev/wallet/grant endpoint, gated by Config.Dev.EnableDevEndpoints.
+// top-up endpoint, which only admins may use (see TopUpHandler).
 func (s *Service) Grant(ctx context.Context, userID uuid.UUID, amount int32) (Transaction, error) {
 	if amount <= 0 {
 		return Transaction{}, apperr.BadRequest("invalid_amount", "Сумма начисления должна быть положительной")

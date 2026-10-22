@@ -20,4 +20,6 @@ type Repository interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) error
+	// MakeAdmin gives the account the admin role and the given password hash.
+	MakeAdmin(ctx context.Context, id uuid.UUID, passwordHash string) error
 }

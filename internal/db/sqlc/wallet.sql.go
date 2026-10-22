@@ -39,9 +39,10 @@ func (q *Queries) CreateWalletTransaction(ctx context.Context, arg CreateWalletT
 const getTotalDiamondsSpent = `-- name: GetTotalDiamondsSpent :one
 SELECT COALESCE(-SUM(amount), 0)::bigint AS total_spent
 FROM wallet_transactions
-WHERE user_id = $1 AND amount < 0
+WHERE user_id = $1 AND amount < 0 AND reason <> 'balance_adjustment'
 `
 
+// Balance adjustments (migration 0021) are corrections, not spending.
 func (q *Queries) GetTotalDiamondsSpent(ctx context.Context, userID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, getTotalDiamondsSpent, userID)
 	var total_spent int64

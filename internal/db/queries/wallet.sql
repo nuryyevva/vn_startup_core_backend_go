@@ -16,6 +16,7 @@ VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: GetTotalDiamondsSpent :one
+-- Balance adjustments (migration 0021) are corrections, not spending.
 SELECT COALESCE(-SUM(amount), 0)::bigint AS total_spent
 FROM wallet_transactions
-WHERE user_id = $1 AND amount < 0;
+WHERE user_id = $1 AND amount < 0 AND reason <> 'balance_adjustment';

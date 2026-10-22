@@ -4,6 +4,8 @@ package wallet_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -108,4 +110,57 @@ func TestWalletIntegration_ConcurrentDebitsNeverGoNegative(t *testing.T) {
 	assert.Equal(t, int64(startingBalance)-successCount*debitAmount, balance)
 	assert.Greater(t, failureCount, int64(0), "expected at least one debit to be rejected for insufficient funds")
 	assert.LessOrEqual(t, successCount, int64(startingBalance/debitAmount))
+}
+
+// TestWalletIntegration_StartingBalanceMigration replays migration 0021 on
+// accounts in every state it can meet and checks each ends at exactly the
+// starting balance, without the correction counting as spending.
+func TestWalletIntegration_StartingBalanceMigration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in -short mode")
+	}
+
+	pool := testutil.StartPostgres(t)
+	ctx := context.Background()
+	authRepo := auth.NewPostgresRepository(pool)
+	svc := wallet.NewService(wallet.NewPostgresRepository(pool))
+
+	empty, err := authRepo.CreateUser(ctx, "empty@example.com", "hash")
+	require.NoError(t, err)
+	rich, err := authRepo.CreateUser(ctx, "rich@example.com", "hash")
+	require.NoError(t, err)
+	spender, err := authRepo.CreateUser(ctx, "spender@example.com", "hash")
+	require.NoError(t, err)
+	exact, err := authRepo.CreateUser(ctx, "exact@example.com", "hash")
+	require.NoError(t, err)
+
+	_, err = svc.Grant(ctx, rich.ID, 31175)
+	require.NoError(t, err)
+	_, err = svc.Grant(ctx, spender.ID, 1000)
+	require.NoError(t, err)
+	require.NoError(t, svc.Debit(ctx, spender.ID, 900, wallet.ReasonDialogMessage))
+	_, err = svc.Grant(ctx, exact.ID, wallet.StartingBalance)
+	require.NoError(t, err)
+
+	migration, err := os.ReadFile(filepath.Join("..", "..", "migrations", "0021_wallet_starting_balance.up.sql"))
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, string(migration))
+	require.NoError(t, err)
+
+	for _, u := range []auth.User{empty, rich, spender, exact} {
+		balance, err := svc.Balance(ctx, u.ID)
+		require.NoError(t, err)
+		assert.EqualValues(t, wallet.StartingBalance, balance, u.Email)
+	}
+
+	spent, err := svc.TotalSpent(ctx, rich.ID)
+	require.NoError(t, err)
+	assert.Zero(t, spent, "taking the extra diamonds away isn't spending")
+	spent, err = svc.TotalSpent(ctx, spender.ID)
+	require.NoError(t, err)
+	assert.EqualValues(t, 900, spent)
+
+	var adjustments int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT count(*) FROM wallet_transactions WHERE user_id = $1 AND reason = 'balance_adjustment'`, exact.ID).Scan(&adjustments))
+	assert.Zero(t, adjustments, "an account already at the starting balance is left alone")
 }

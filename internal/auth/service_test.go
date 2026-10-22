@@ -37,6 +37,11 @@ func (m *mockRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUID, p
 	return args.Error(0)
 }
 
+func (m *mockRepository) MakeAdmin(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	args := m.Called(ctx, id, passwordHash)
+	return args.Error(0)
+}
+
 func newTestIssuer() *TokenIssuer {
 	return NewTokenIssuer("test-secret-value-1234567890", 15*time.Minute, 720*time.Hour)
 }

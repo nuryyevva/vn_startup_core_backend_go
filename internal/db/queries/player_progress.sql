@@ -10,6 +10,7 @@ SELECT
     s.genre AS story_genre,
     s.status AS story_status,
     s.created_at AS story_created_at,
+    s.coming_soon AS story_coming_soon,
     pp.current_scene_id,
     pp.choices_made,
     pp.updated_at,

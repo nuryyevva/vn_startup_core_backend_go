@@ -35,9 +35,6 @@ var (
 	bwMorganID = uuid.MustParse("33333333-3333-3333-3333-3333333333a5")
 )
 
-// bwTalkMessages is the free-dialog message limit of every talk beat; 0 means no limit.
-const bwTalkMessages = 8
-
 const blackwoodMedia = "/media/stories/fog-over-blackwood/"
 
 const (
@@ -361,7 +358,7 @@ func sceneTwo(g *storyGraph) {
 	)
 
 	look := from("s2.hall")
-	g.beat("s2.hall", bwCafeteria).talksWith(bwNoahID, noah.sprite, bwTalkMessages)
+	g.beat("s2.hall", bwCafeteria).talksWith(bwNoahID, noah.sprite)
 	g.explore(look, "Доска объявлений", "s2.board")
 	g.explore(look, "Дальний стол", "s2.hall",
 		narr("За дальним столом сидят трое: Люси, Адриан и Дэмиан Вейлы.").hide(),
@@ -382,7 +379,7 @@ func sceneTwo(g *storyGraph) {
 		narr("Дэмиан замечает её взгляд раньше, чем она успевает отвернуться.").show(damian),
 		damian.say("Если хочешь что-то спросить — спрашивай. Я не кусаюсь. Пока не доказано обратное."),
 		narr("Кольцо на его пальце делает ещё один оборот.").show(damianSmile),
-	).talksWith(bwDamianID, damian.sprite, bwTalkMessages)
+	).talksWith(bwDamianID, damian.sprite)
 	g.link(from("s2.damian"), "Вернуться к Ною", "s2.hall",
 		evelyn.say("Не сегодня."),
 		damian.say("Как знаешь."),
@@ -392,7 +389,7 @@ func sceneTwo(g *storyGraph) {
 	g.beat("s2.lucy", bwCafeteria,
 		narr("Стоит Эвелин задержать на ней взгляд, Люси поднимает голову и улыбается.").show(lucySmile),
 		thought("Она заметила меня раньше, чем я решила на неё посмотреть. Или мне просто неловко, что я пялюсь."),
-	).talksWith(bwLucyID, lucy.sprite, bwTalkMessages)
+	).talksWith(bwLucyID, lucy.sprite)
 	g.link(from("s2.lucy"), "Вернуться к Ною", "s2.hall",
 		narr("Люси машет ей и возвращается к тетради.").show(lucySmile),
 	)
@@ -533,7 +530,7 @@ func sceneThree(g *storyGraph) (hasPhoto, noPhoto lineCondition) {
 	)
 
 	g.beat("s3.aftermath", bwParking,
-		narr("Ной прибегает от ступеней. Водитель выбирается из машины.").hide(),
+		narr("Ной прибегает от ступеней. Водитель выбирается из машины.").show(noahWorried),
 	)
 
 	explore := from("s3.aftermath", "s3.lot")
@@ -563,7 +560,7 @@ func sceneThree(g *storyGraph) (hasPhoto, noPhoto lineCondition) {
 	g.beat("s3.noah", bwParking,
 		evelyn.say("Ты видел, как он оказался рядом?"),
 		noah.say("Нет. Я услышал удар и выбежал."),
-	).talksWith(bwNoahID, noah.sprite, bwTalkMessages)
+	).talksWith(bwNoahID, noah.sprite)
 	g.link(from("s3.noah"), "Настаивать", "s3.lot",
 		noahAngry.say("Я верю, что ты что-то увидела. Но не буду говорить, что видел это тоже."),
 		thought("Неприятно. Но лучше, чем если бы он просто согласился.").show(evelyn),
@@ -604,7 +601,7 @@ func sceneFour(g *storyGraph, hasPhoto, noPhoto lineCondition) {
 	).titled("Версия, в которую удобно поверить")
 
 	watch := from("s4.corridor", "s4.watch")
-	g.beat("s4.watch", bwCorridor).talksWith(bwAdrianID, adrian.sprite, bwTalkMessages)
+	g.beat("s4.watch", bwCorridor).talksWith(bwAdrianID, adrian.sprite)
 	g.explore(watch, "Присмотреться к книге", "s4.watch",
 		narr("За то время, пока Эвелин идёт по коридору, он ни разу не переворачивает страницу.").show(adrian),
 		thought("Может, он тоже плохо спал. Почему мне вообще хочется найти что-то, что нас объединяет?"),
@@ -715,7 +712,7 @@ func sceneFive(g *storyGraph) {
 	)
 
 	explore := from("s5.room")
-	g.beat("s5.room", bwArchive).talksWith(bwMorganID, morgan.sprite, bwTalkMessages)
+	g.beat("s5.room", bwArchive).talksWith(bwMorganID, morgan.sprite)
 	g.explore(explore, "Карта окрестностей", "s5.room",
 		narr("На стене висит карта с пометками карандашом. Северный берег озера обведён.").hide(),
 		narr("К нему ведёт лесная дорога, заканчивающаяся возле маленького прямоугольника."),
@@ -852,7 +849,7 @@ func sceneSix(g *storyGraph) {
 		narr("Лес подступает к дороге вплотную. В низинах лежит туман. Иногда фары выхватывают старые указатели, надписи на которых почти стёрлись."),
 		narr("Адриан сбрасывает скорость перед поворотами ещё до того, как они появляются в свете фар.").show(adrian),
 		thought("Он хорошо знает дорогу. Хотя у озера якобы никогда не был.").show(evelyn),
-	).talksWith(bwAdrianID, adrian.sprite, bwTalkMessages)
+	).talksWith(bwAdrianID, adrian.sprite)
 	arrival := []scriptLine{
 		narr("Дальше дорогу перекрывает упавшая сосна.").bg(bwForestRoad).hide(),
 		narr("За ней начинается тропа к одноэтажному дому на невысоком склоне. Между стволами поблёскивает вода."),

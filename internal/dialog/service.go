@@ -66,6 +66,9 @@ func NewService(
 	}
 }
 
+// MessageCost is what each message the player sends costs, in diamonds.
+func (s *Service) MessageCost() int32 { return s.defaultMessageCost }
+
 func (s *Service) StartSession(ctx context.Context, userID, characterID, sceneID uuid.UUID) (Session, error) {
 	scene, err := s.scenes.GetSceneInfo(ctx, sceneID)
 	if err != nil {
