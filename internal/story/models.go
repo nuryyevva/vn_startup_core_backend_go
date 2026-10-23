@@ -59,6 +59,7 @@ type Scene struct {
 	CreatedAt          time.Time
 	UnlockCostDiamonds *int32
 	CharacterSpriteURL *string
+	CharacterName      *string
 	SpriteFraming      SpriteFraming
 	BackgroundMusicURL *string
 	// ChapterTitle is set only on the scene that starts a chapter, Title
@@ -181,6 +182,7 @@ type SceneResponse struct {
 	DialogLimitValue   *int32           `json:"dialog_limit_value,omitempty"`
 	UnlockCostDiamonds *int32           `json:"unlock_cost_diamonds,omitempty"`
 	CharacterSpriteURL *string          `json:"character_sprite_url,omitempty"`
+	CharacterName      *string          `json:"character_name,omitempty"`
 	SpriteFraming      SpriteFraming    `json:"sprite_framing"`
 	BackgroundMusicURL *string          `json:"background_music_url,omitempty"`
 	ChapterTitle       *string          `json:"chapter_title,omitempty"`
@@ -247,6 +249,7 @@ func toSceneResponse(s Scene, choices []Choice) SceneResponse {
 		DialogLimitValue:   s.DialogLimitValue,
 		UnlockCostDiamonds: s.UnlockCostDiamonds,
 		CharacterSpriteURL: s.CharacterSpriteURL,
+		CharacterName:      s.CharacterName,
 		SpriteFraming:      s.SpriteFraming,
 		BackgroundMusicURL: s.BackgroundMusicURL,
 		ChapterTitle:       s.ChapterTitle,

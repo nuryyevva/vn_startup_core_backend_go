@@ -114,6 +114,7 @@ type scene struct {
 	backgroundURL      string
 	characterID        *uuid.UUID
 	characterSpriteURL *string
+	characterName      *string
 	spriteFraming      domain.SpriteFraming // "" = the full figure
 	backgroundMusicURL *string
 	dialogueScript     string // JSON array literal
@@ -180,8 +181,8 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 
 	for _, sc := range s.scenes {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, character_sprite_url, background_music_url, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds, title, chapter_title, sprite_framing)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+			`INSERT INTO scenes (id, story_id, order_index, background_url, character_id, character_sprite_url, background_music_url, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, unlock_cost_diamonds, title, chapter_title, sprite_framing, character_name)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 			 ON CONFLICT (id) DO UPDATE SET
 			     order_index = EXCLUDED.order_index, background_url = EXCLUDED.background_url,
 			     character_id = EXCLUDED.character_id, character_sprite_url = EXCLUDED.character_sprite_url,
@@ -189,10 +190,10 @@ func (s story) insert(ctx context.Context, pool *pgxpool.Pool) error {
 			     free_dialog_enabled = EXCLUDED.free_dialog_enabled, dialog_limit_type = EXCLUDED.dialog_limit_type,
 			     dialog_limit_value = EXCLUDED.dialog_limit_value, unlock_cost_diamonds = EXCLUDED.unlock_cost_diamonds,
 			     title = EXCLUDED.title, chapter_title = EXCLUDED.chapter_title,
-			     sprite_framing = EXCLUDED.sprite_framing`,
+			     sprite_framing = EXCLUDED.sprite_framing, character_name = EXCLUDED.character_name`,
 			sc.id, s.id, sc.orderIndex, sc.backgroundURL, sc.characterID, sc.characterSpriteURL, sc.backgroundMusicURL,
 			[]byte(sc.dialogueScript), sc.freeDialogEnabled, sc.dialogLimitType, sc.dialogLimitValue, sc.unlockCostDiamonds,
-			sc.title, sc.chapterTitle, sc.framing(),
+			sc.title, sc.chapterTitle, sc.framing(), sc.characterName,
 		); err != nil {
 			return fmt.Errorf("insert scene %s: %w", sc.id, err)
 		}
@@ -370,6 +371,7 @@ func redRidingHoodStory() story {
 				backgroundURL:      ridingHoodForestBackground,
 				characterID:        uuidPtr(redRidingHoodWolfID),
 				characterSpriteURL: strPtr(ridingHoodWolfSprite),
+				characterName:      strPtr("Волк"),
 				backgroundMusicURL: strPtr(ridingHoodBackgroundMusic),
 				dialogueScript:     `[{"speaker":"narrator","text":"На тропинке девочку встретил Волк. Он был не прочь узнать, куда она идёт."},{"speaker":"Волк","text":"Куда путь держишь, дитя, в такой ранний час?"}]`,
 				freeDialogEnabled:  true,
@@ -440,6 +442,7 @@ func aliceStory() story {
 				backgroundURL:      aliceRabbitHoleBackground,
 				characterID:        uuidPtr(aliceRabbitID),
 				characterSpriteURL: strPtr(aliceRabbitSprite),
+				characterName:      strPtr("Белый Кролик"),
 				backgroundMusicURL: strPtr(aliceBackgroundMusic),
 				dialogueScript:     `[{"speaker":"narrator","text":"Алиса нырнула вслед за Кроликом в нору, даже не подумав, как же она будет выбираться обратно."},{"speaker":"narrator","text":"Нора шла прямо, как туннель, а потом внезапно обрывалась вниз — и падение оказалось на удивление медленным."}]`,
 				freeDialogEnabled:  true,

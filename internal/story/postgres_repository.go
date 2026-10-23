@@ -305,6 +305,7 @@ func toDomainScene(s sqlc.Scene) Scene {
 		CreatedAt:          s.CreatedAt,
 		UnlockCostDiamonds: ptrFromInt4(s.UnlockCostDiamonds),
 		CharacterSpriteURL: ptrFromText(s.CharacterSpriteUrl),
+		CharacterName:      ptrFromText(s.CharacterName),
 		SpriteFraming:      SpriteFraming(s.SpriteFraming),
 		BackgroundMusicURL: ptrFromText(s.BackgroundMusicUrl),
 		ChapterTitle:       ptrFromText(s.ChapterTitle),

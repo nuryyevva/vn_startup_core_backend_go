@@ -69,6 +69,7 @@ type Scene struct {
 	Title              pgtype.Text `json:"title"`
 	ChapterTitle       pgtype.Text `json:"chapter_title"`
 	SpriteFraming      string      `json:"sprite_framing"`
+	CharacterName      pgtype.Text `json:"character_name"`
 }
 
 type SceneUnlock struct {

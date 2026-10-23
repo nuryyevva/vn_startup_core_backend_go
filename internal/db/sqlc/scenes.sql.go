@@ -47,7 +47,7 @@ func (q *Queries) GetChoice(ctx context.Context, id uuid.UUID) (Choice, error) {
 }
 
 const getScene = `-- name: GetScene :one
-SELECT scenes.id, scenes.story_id, scenes.order_index, scenes.background_url, scenes.character_id, scenes.dialogue_script, scenes.free_dialog_enabled, scenes.dialog_limit_type, scenes.dialog_limit_value, scenes.created_at, scenes.unlock_cost_diamonds, scenes.character_sprite_url, scenes.background_music_url, scenes.title, scenes.chapter_title, scenes.sprite_framing, stories.coming_soon AS story_coming_soon
+SELECT scenes.id, scenes.story_id, scenes.order_index, scenes.background_url, scenes.character_id, scenes.dialogue_script, scenes.free_dialog_enabled, scenes.dialog_limit_type, scenes.dialog_limit_value, scenes.created_at, scenes.unlock_cost_diamonds, scenes.character_sprite_url, scenes.background_music_url, scenes.title, scenes.chapter_title, scenes.sprite_framing, scenes.character_name, stories.coming_soon AS story_coming_soon
 FROM scenes
 JOIN stories ON stories.id = scenes.story_id
 WHERE scenes.id = $1
@@ -80,6 +80,7 @@ func (q *Queries) GetScene(ctx context.Context, id uuid.UUID) (GetSceneRow, erro
 		&i.Scene.Title,
 		&i.Scene.ChapterTitle,
 		&i.Scene.SpriteFraming,
+		&i.Scene.CharacterName,
 		&i.StoryComingSoon,
 	)
 	return i, err
@@ -207,7 +208,7 @@ func (q *Queries) ListChoicesByScene(ctx context.Context, sceneID uuid.UUID) ([]
 }
 
 const listScenesByStory = `-- name: ListScenesByStory :many
-SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title, sprite_framing FROM scenes WHERE story_id = $1 ORDER BY order_index ASC
+SELECT id, story_id, order_index, background_url, character_id, dialogue_script, free_dialog_enabled, dialog_limit_type, dialog_limit_value, created_at, unlock_cost_diamonds, character_sprite_url, background_music_url, title, chapter_title, sprite_framing, character_name FROM scenes WHERE story_id = $1 ORDER BY order_index ASC
 `
 
 func (q *Queries) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]Scene, error) {
@@ -236,6 +237,7 @@ func (q *Queries) ListScenesByStory(ctx context.Context, storyID uuid.UUID) ([]S
 			&i.Title,
 			&i.ChapterTitle,
 			&i.SpriteFraming,
+			&i.CharacterName,
 		); err != nil {
 			return nil, err
 		}

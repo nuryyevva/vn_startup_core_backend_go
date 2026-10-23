@@ -186,6 +186,7 @@ type graphBeat struct {
 // folder under the same ID.
 type talkTo struct {
 	characterID uuid.UUID
+	name        string // the character's name for the chat header and the talk button
 	sprite      string // shown whenever no line has chosen a sprite yet
 }
 
@@ -218,8 +219,8 @@ func (g *storyGraph) beat(key, bg string, lines ...scriptLine) *graphBeat {
 //
 // Conversations have no length limit: each message the player sends costs
 // diamonds (dialog.MessageCost), and that is what paces them.
-func (b *graphBeat) talksWith(characterID uuid.UUID, sprite string) *graphBeat {
-	b.talk = &talkTo{characterID: characterID, sprite: sprite}
+func (b *graphBeat) talksWith(characterID uuid.UUID, name, sprite string) *graphBeat {
+	b.talk = &talkTo{characterID: characterID, name: name, sprite: sprite}
 	return b
 }
 
@@ -376,6 +377,7 @@ func (g *storyGraph) build() ([]scene, []choice, error) {
 		}
 		if t := b.talk; t != nil {
 			sc.characterID = uuidPtr(t.characterID)
+			sc.characterName = strPtr(t.name)
 			if t.sprite != "" {
 				sc.characterSpriteURL = strPtr(t.sprite)
 			}
