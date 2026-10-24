@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -126,6 +128,10 @@ func (s *Service) SessionOwner(ctx context.Context, sessionID uuid.UUID) (uuid.U
 // SendMessage records the user's message, charges diamonds for it, and
 // ends the session if this message exhausted its limit.
 func (s *Service) SendMessage(ctx context.Context, userID, sessionID uuid.UUID, text string) (Message, *int32, error) {
+	if utf8.RuneCountInString(text) > MaxMessageLength {
+		return Message{}, nil, apperr.BadRequest("message_too_long",
+			fmt.Sprintf("Сообщение слишком длинное: не больше %d символов", MaxMessageLength))
+	}
 	session, err := s.GetSession(ctx, userID, sessionID)
 	if err != nil {
 		return Message{}, nil, err

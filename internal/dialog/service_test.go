@@ -2,6 +2,7 @@ package dialog
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -238,3 +239,41 @@ func TestService_EndSession_AlreadyEnded(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestService_SendMessage_TooLongIsRefusedBeforeAnythingIsCharged(t *testing.T) {
+	repo := new(mockRepository)
+	wallet := new(mockWallet)
+	publisher := new(mockPublisher)
+	svc := newTestService(repo, new(mockSceneProvider), wallet, publisher, new(mockNotifier))
+
+	text := strings.Repeat("я", MaxMessageLength+1) // по символам, а не по байтам: «я» занимает два байта
+
+	_, _, err := svc.SendMessage(context.Background(), uuid.New(), uuid.New(), text)
+
+	var appErr *apperr.Error
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, "message_too_long", appErr.Code)
+	wallet.AssertNotCalled(t, "Debit", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	publisher.AssertNotCalled(t, "Publish", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestService_SendMessage_TheLimitItselfIsAllowed(t *testing.T) {
+	repo := new(mockRepository)
+	wallet := new(mockWallet)
+	publisher := new(mockPublisher)
+	svc := newTestService(repo, new(mockSceneProvider), wallet, publisher, new(mockNotifier))
+
+	userID, sessionID := uuid.New(), uuid.New()
+	text := strings.Repeat("я", MaxMessageLength)
+	session := Session{ID: sessionID, UserID: userID, Status: StatusActive, LimitType: LimitTypeNone}
+	repo.On("GetSession", mock.Anything, sessionID).Return(session, nil)
+	wallet.On("Debit", mock.Anything, userID, mock.Anything, "dialog_message").Return(nil)
+	repo.On("IncrementMessageCount", mock.Anything, sessionID).Return(session, nil)
+	repo.On("CreateMessage", mock.Anything, sessionID, SenderUser, text, mock.Anything).
+		Return(Message{ID: uuid.New(), SessionID: sessionID, Sender: SenderUser, Text: text}, nil)
+	publisher.On("Publish", mock.Anything, "dialog.message.sent", mock.Anything).Return(nil)
+
+	_, _, err := svc.SendMessage(context.Background(), userID, sessionID, text)
+
+	require.NoError(t, err)
+}

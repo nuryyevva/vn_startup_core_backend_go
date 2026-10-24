@@ -55,6 +55,11 @@ type SendMessageRequest struct {
 	Text string `json:"text"`
 }
 
+// MaxMessageLength is the longest message (in characters) a player may send in a free dialog. Anything longer is
+// refused before it is charged: a huge text can neither reach the AI (NATS carries at most 1 MB per event) nor be
+// answered in reasonable time or at reasonable cost, and it would stay in the dialog history of every later reply.
+const MaxMessageLength = 1000
+
 // MessageCost is the price in diamonds of each message the player sends in
 // a free dialog. Conversations have no length limit; this is what paces them.
 const MessageCost int32 = 10
